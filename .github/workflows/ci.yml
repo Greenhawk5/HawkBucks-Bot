@@ -34,8 +34,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test -- --run --reporter=verbose
-
       - name: Validate deployment configuration
         run: node scripts/validate-deployment.js

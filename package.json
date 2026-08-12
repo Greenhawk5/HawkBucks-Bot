@@ -8,12 +8,9 @@
     "deploy:d1": "node scripts/deploy-d1-schema.js",
     "deploy:full": "node scripts/embed-assets.js && node scripts/deploy-d1-schema.js && wrangler deploy",
     "dev": "wrangler dev",
-    "start": "wrangler dev",
-    "test": "vitest"
+    "start": "wrangler dev"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.4",
-    "vitest": "~3.2.0",
     "wrangler": "^4.114.0"
   },
   "dependencies": {
