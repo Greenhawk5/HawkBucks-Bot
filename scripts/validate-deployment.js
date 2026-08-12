@@ -71,8 +71,12 @@ async function validateDeployment() {
       throw new Error('Incorrect buildMissionHTML function call');
     }
     
-    if (missionImage.includes('generateScreenshot(') && !missionImage.includes('generateScreenshot(html, env)')) {
-      throw new Error('Incorrect generateScreenshot function call');
+    if (missionImage.includes('generateScreenshot(')) {
+      // Accept generateScreenshot(html, env) or generateScreenshot(html, env, layout) etc.
+      const re = /generateScreenshot\s*\(\s*html\s*,\s*env/;
+      if (!re.test(missionImage)) {
+        throw new Error('Incorrect generateScreenshot function call; expected generateScreenshot(html, env, ...)');
+      }
     }
     
     console.log("✅ Function signatures are correct");
