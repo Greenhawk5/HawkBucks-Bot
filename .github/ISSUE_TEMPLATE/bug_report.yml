@@ -1,0 +1,89 @@
+name: Bug Report
+description: Report a reproducible problem in HawkBucks Bot.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug.
+
+        Please make sure you are not including Telegram tokens, API keys,
+        private user data, or other sensitive information.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clearly describe the problem.
+      placeholder: Tell us what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: Describe the expected behavior.
+      placeholder: Tell us what should have happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable reproduction.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - Telegram interaction
+        - Mission processing
+        - Daily reminders
+        - Groups or channels
+        - Mission image rendering
+        - Database / D1
+        - Deployment / Cloudflare
+        - Testing
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: e.g. 22.x
+
+  - type: input
+    id: wrangler
+    attributes:
+      label: Wrangler version
+      placeholder: e.g. 4.x
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste only redacted, non-sensitive logs.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked existing issues for duplicates.
+          required: true
+        - label: I removed tokens, API keys, credentials, and private data.
+          required: true

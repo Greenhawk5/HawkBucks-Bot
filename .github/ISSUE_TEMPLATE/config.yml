@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/Greenhawk5/HawkBucks-Bot/security/advisories/new
+    about: Please report security vulnerabilities privately instead of opening a public issue.
+
+  - name: Support & Troubleshooting
+    url: https://github.com/Greenhawk5/HawkBucks-Bot/blob/main/SUPPORT.md
+    about: Read the support guide before opening a bug report.
+
+  - name: Contributing Guide
+    url: https://github.com/Greenhawk5/HawkBucks-Bot/blob/main/CONTRIBUTING.md
+    about: Read the contribution workflow before submitting a Pull Request.
