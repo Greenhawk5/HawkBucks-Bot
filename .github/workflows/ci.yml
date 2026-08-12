@@ -29,13 +29,13 @@ jobs:
           node-version: '18'
           cache: npm
         env:
-          ACTIONS_ALLOW_UNSECURE_NODE_VERSION: false
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test -- --run
+        run: npm test -- --run --reporter=verbose
 
       - name: Validate deployment configuration
         run: node scripts/validate-deployment.js
