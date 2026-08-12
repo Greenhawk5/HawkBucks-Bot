@@ -2,8 +2,11 @@
   "name": "hawkbucks-cloudflare",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "node scripts/embed-assets.js && wrangler deploy",
+    "deploy:d1": "node scripts/deploy-d1-schema.js",
+    "deploy:full": "node scripts/embed-assets.js && node scripts/deploy-d1-schema.js && wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
     "test": "vitest"
@@ -12,5 +15,8 @@
     "@cloudflare/vitest-pool-workers": "^0.12.4",
     "vitest": "~3.2.0",
     "wrangler": "^4.114.0"
+  },
+  "dependencies": {
+    "linkedom": "^0.18.13"
   }
 }

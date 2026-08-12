@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>HawkBucks — Today's V-Buck Missions</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <!-- Add class="count-dense" to <body> when missions.length >= 8 -->
+  <body>
+    <div class="canvas">
+      <header class="header">
+        <div class="brand">
+          <img class="brand__logo" src="logo.png" alt="HawkBucks" />
+          <h1 class="brand__title">Today's V-Buck Missions</h1>
+          <p class="brand__date">{{DATE}}</p>
+        </div>
+
+        <div class="total-badge">
+          <span class="total-badge__label">Total V-Bucks Today</span>
+          <span class="total-badge__value">
+            <img class="icon-vbucks" src="vbucks.png" alt="" />
+            {{TOTAL_VBUCKS}}
+          </span>
+        </div>
+      </header>
+
+      <main class="missions">
+        <!-- CARD COMPONENT — repeat this block per mission -->
+         {{MISSIONS}}
+      </main>
+
+      <footer class="footer">
+        <span class="handle">@HawkBucks_bot</span>
+      </footer>
+    </div>
+  </body>
+</html>

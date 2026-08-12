@@ -1,0 +1,454 @@
+/* HawkBucks mission image template
+   Canvas: 1080 x 1620, dark premium gaming infographic.
+   Plain CSS only. No libraries, no JS. */
+
+/* Self-hosted variable fonts — bundled in ./fonts/, no network at render time. */
+@font-face {
+  font-family: "Sora";
+  src: url("./fonts/Sora.ttf") format("truetype-variations");
+  font-weight: 100 800;
+  font-display: block;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/Inter.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-display: block;
+}
+
+
+:root {
+  --bg: #0e1012;
+  --bg-2: #14171a;
+  --card: #16191d;
+  --card-top: #1e2227;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --divider: rgba(255, 255, 255, 0.06);
+  --accent: #36d97e;
+  --accent-soft: rgba(54, 217, 126, 0.1);
+  --accent-2: #6dd5fa;
+  --text: #ffffff;
+  --text-dim: #a8b0b8;
+
+  --pad: 80px;
+  --radius-card: 24px;
+  --radius-pill: 999px;
+  --gap: 24px;
+
+  --font-display: "Sora", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-body: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  background: var(--bg);
+}
+
+.canvas {
+  position: relative;
+  width: 1080px;
+  height: 1620px;
+  padding: var(--pad);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* layered ambient background: soft accent bloom + vertical depth */
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(
+      900px 520px at 12% -6%,
+      rgba(54, 217, 126, 0.13) 0%,
+      rgba(54, 217, 126, 0) 62%
+    ),
+    radial-gradient(
+      760px 520px at 104% 104%,
+      rgba(109, 213, 250, 0.09) 0%,
+      rgba(109, 213, 250, 0) 60%
+    ),
+    linear-gradient(180deg, #14171a 0%, #0e1012 46%, #0b0d0f 100%);
+}
+
+/* fine grid texture — keeps large dark areas from looking flat */
+.canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(
+    120% 90% at 50% 0%,
+    #000 0%,
+    rgba(0, 0, 0, 0.35) 60%,
+    transparent 100%
+  );
+}
+
+.canvas > * {
+  position: relative;
+  z-index: 1;
+}
+
+
+/* ---------------- Header ---------------- */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  flex: none;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.brand__logo {
+  width: 110px;
+  height: 110px;
+  border-radius: 22px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.brand__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 56px;
+  letter-spacing: -0.02em;
+}
+
+.brand__date {
+  font-size: 20px;
+  line-height: 28px;
+  color: var(--text-dim);
+}
+
+.total-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 85px;
+    box-sizing: border-box;
+    padding: 0px 26px;
+    gap: 10px;
+    background: linear-gradient(180deg, rgba(54, 217, 126, 0.16) 0%, rgba(54, 217, 126, 0.06) 100%);
+    border: 1px solid rgba(54, 217, 126, 0.3);
+    border-radius: var(--radius-pill);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 26px -14px rgba(54, 217, 126, 0.5);
+}
+
+.total-badge__label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.total-badge__value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 36px;
+  color: var(--accent);
+  /* margin-top: 3px; */
+}
+
+.total-badge__value .icon-vbucks {
+  width: 30px;
+  height: 30px;
+}
+
+/* ---------------- Mission list ---------------- */
+
+.missions {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gap);
+  margin: 48px 0 40px;
+}
+
+/* ---------------- Mission card ---------------- */
+
+.mission {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 26px 32px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.012) 38%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    linear-gradient(180deg, var(--card-top) 0%, var(--card) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 18px 34px -22px rgba(0, 0, 0, 0.9);
+}
+
+/* thin accent edge on the left — quiet, premium */
+.mission::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(54, 217, 126, 0) 0%,
+    rgba(54, 217, 126, 0.75) 50%,
+    rgba(54, 217, 126, 0) 100%
+  );
+}
+
+.mission__icon {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      80% 80% at 50% 0%,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0) 70%
+    ),
+    linear-gradient(180deg, #1a1e22 0%, #121517 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+
+.mission__icon img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.mission__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mission__type {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 42px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mission__zone {
+  font-size: 22px;
+  line-height: 30px;
+  color: var(--text);
+}
+
+.mission__biome {
+  font-size: 18px;
+  line-height: 26px;
+  color: var(--text-dim);
+}
+
+.mission__rail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 168px;
+}
+
+.vbucks {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 22px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(54, 217, 126, 0.18) 0%,
+      rgba(54, 217, 126, 0.06) 100%
+    );
+  border: 1px solid rgba(54, 217, 126, 0.32);
+  border-radius: var(--radius-pill);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 10px 22px -16px rgba(54, 217, 126, 0.6);
+}
+
+
+.vbucks img {
+  width: 34px;
+  height: 34px;
+}
+
+.vbucks__amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 46px;
+  color: var(--accent);
+}
+
+.power {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 28px;
+  color: var(--accent-2);
+}
+
+.power img {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---------------- Dense mode (8-10 missions) ---------------- */
+
+.count-dense .missions {
+  gap: 8px;
+  margin: 30px 0 24px;
+}
+
+.count-dense .mission {
+  padding: 9px 26px;
+  gap: 20px;
+}
+
+.count-dense .mission__icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 16px;
+}
+
+.count-dense .mission__icon img {
+  width: 50px;
+  height: 50px;
+}
+
+.count-dense .mission__type {
+  font-size: 26px;
+  line-height: 32px;
+}
+
+.count-dense .mission__zone {
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.count-dense .mission__biome {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.count-dense .mission__rail {
+  gap: 4px;
+  min-width: 152px;
+}
+
+.count-dense .vbucks {
+  padding: 4px 18px;
+}
+
+.count-dense .vbucks__amount {
+  font-size: 32px;
+  line-height: 38px;
+}
+
+.count-dense .vbucks img {
+  width: 28px;
+  height: 28px;
+}
+
+.count-dense .power {
+  font-size: 18px;
+  line-height: 22px;
+}
+
+/* ---------------- Footer ---------------- */
+
+.footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-top: 32px;
+  border-top: 1px solid var(--divider);
+}
+
+.reset {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.reset__label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.reset__time {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 36px;
+  color: var(--text);
+  margin-left: 20px;
+}
+
+.handle {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+}

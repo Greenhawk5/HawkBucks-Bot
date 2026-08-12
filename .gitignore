@@ -165,3 +165,9 @@ dist
 .env*
 !.env.example
 .wrangler/
+
+# Test files
+test.css
+test.html
+test/
+vitest.config.js

@@ -1,0 +1,2 @@
+ALTER TABLE users
+ADD COLUMN reminder_enabled INTEGER DEFAULT 1;
