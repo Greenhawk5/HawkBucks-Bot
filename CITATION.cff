@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+title: "HawkBucks Bot"
+message: "If you use HawkBucks Bot in academic work, research, documentation, or another project, please cite this repository."
+type: software
+authors:
+  - family-names: "Faniani"
+    given-names: "Ali"
+    affiliation: "Independent Developer"
+repository-code: "https://github.com/Greenhawk5/HawkBucks-Bot"
+url: "https://github.com/Greenhawk5/HawkBucks-Bot"
+license: "MIT"
+version: "0.1.0"
+date-released: "2026-08-12"
+keywords:
+  - Fortnite
+  - Save the World
+  - V-Bucks
+  - Telegram
+  - Telegram Bot
+  - Cloudflare Workers
+  - Cloudflare D1
