@@ -8,6 +8,7 @@ const VALID_ZONES = new Set([
 import { isPlaceholderMissionType, missionTypeKey, normalizeZone } from "./normalizer.js";
 
 export function validateMissions(missions) {
+    console.log("VALIDATION_INPUT", missions.map(logMission));
     console.log("✓ validateMissions: Starting validation on", missions.length, "missions");
 
     const seen = new Set();
@@ -55,5 +56,10 @@ export function validateMissions(missions) {
     });
 
     console.log("✓ validateMissions: After validation:", filtered.length, "missions remain");
+    console.log("VALIDATION_OUTPUT", filtered.map(logMission));
     return filtered;
+}
+
+function logMission(mission) {
+    return { zone: mission.zone, powerLevel: mission.powerLevel, type: mission.mission?.type, category: mission.mission?.category, reward: mission.reward?.amount };
 }

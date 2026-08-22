@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test test/missions-service.test.js",
     "deploy": "node scripts/embed-assets.js && wrangler deploy",
     "deploy:d1": "node scripts/deploy-d1-schema.js",
     "deploy:full": "node scripts/embed-assets.js && node scripts/deploy-d1-schema.js && wrangler deploy",

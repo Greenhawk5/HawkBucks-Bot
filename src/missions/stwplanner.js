@@ -8,11 +8,13 @@ export async function fetchSTWPlannerMissions() {
 
     const html = await downloadPage(URL);
 
-    return parseSTWPlanner(html);
+    const missions = parseSTWPlanner(html);
+    console.log("STWPLANNER_RAW_RESULT", missions.map(logMission));
+    return missions;
 
 }
 
-function parseSTWPlanner(html) {
+export function parseSTWPlanner(html) {
 
     const { document } = parseHTML(html);
 
@@ -22,26 +24,15 @@ function parseSTWPlanner(html) {
 
     for (const block of blocks) {
 
-        const rewardText =
-            block.textContent ?? "";
+        if (!(block.textContent ?? "").toLowerCase().includes("vbucks")) continue;
+        const entries = block.querySelectorAll(".mission-entry");
+        for (const entry of entries) {
+        const rewardText = entry.textContent ?? "";
+        const zoneElement = entry.querySelector(".mission-zone");
+        const powerLevelText = entry.querySelector(".mission-pl")?.textContent?.trim();
+        const zoneHTML = zoneElement?.innerHTML;
 
-        if (!rewardText.toLowerCase().includes("vbucks")) {
-            continue;
-        }
-
-        const zoneElement =
-            block.querySelector(".mission-zone");
-
-        const powerLevelText =
-            block.querySelector(".mission-pl")
-                ?.textContent
-                ?.trim();
-
-        const zoneHTML =
-            zoneElement?.innerHTML;
-
-        const rewardMatch =
-            rewardText.match(/(\d+)\s*vbucks/i);
+        const rewardMatch = rewardText.match(/(\d+)/);
 
         const powerLevelMatch =
             powerLevelText?.match(/\d+/);
@@ -115,9 +106,14 @@ function parseSTWPlanner(html) {
             })
 
         );
+        }
 
     }
 
     return missions;
 
+}
+
+function logMission(mission) {
+    return { zone: mission.zone, powerLevel: mission.powerLevel, type: mission.mission?.type, category: mission.mission?.category, reward: mission.reward?.amount };
 }

@@ -41,6 +41,14 @@ export function normalizeMissionType(type) {
   return normalizeText(type);
 }
 
+export function normalizeMissions(missions) {
+  return missions.map((mission) => ({
+    ...mission,
+    zone: normalizeZone(mission.zone),
+    mission: { ...mission.mission, type: normalizeMissionType(mission.mission?.type), category: normalizeText(mission.mission?.category) },
+  }));
+}
+
 export function isPlaceholderMissionType(type) {
   return MISSION_PLACEHOLDERS.has(comparisonText(type));
 }
