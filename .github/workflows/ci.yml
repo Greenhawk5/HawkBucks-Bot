@@ -25,11 +25,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Use Node 18 for CI to ensure compatibility with vitest and Cloudflare tooling.
-          node-version: '18'
+          # Node 22 is required: the test suite uses import attributes
+          # (`import ... with { type: "json" }`) and node:test glob features.
+          node-version: '22'
           cache: npm
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Install dependencies
         run: npm ci
