@@ -174,4 +174,5 @@ test/*
 !test/fixtures/**
 vitest.config.js
 epic-web
-test
+!test/*.test.js
+!test/fixtures/
