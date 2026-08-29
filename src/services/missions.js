@@ -12,9 +12,9 @@ function fakeMissions() {
   ];
 }
 
-export async function getDailyMissions() {
+export async function getDailyMissions(env) {
   // Do not inject fallback or fake missions in production mode.
   // Honor FORCE_FAKE_MISSIONS only when explicitly enabled for development/testing.
-  const missions = FORCE_FAKE_MISSIONS ? fakeMissions() : await getTodayVbucksMissions();
+  const missions = FORCE_FAKE_MISSIONS ? fakeMissions() : await getTodayVbucksMissions({ env });
   return { success: missions.length > 0, missions };
 }

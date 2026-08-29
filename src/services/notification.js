@@ -68,7 +68,7 @@ export async function prepareMissionReminder(env, db) {
   }
 
   try {
-    const { missions: rawMissions } = await getDailyMissions();
+    const { missions: rawMissions } = await getDailyMissions(env);
     const missions = groupAndSortMissions(rawMissions);
     const image = missions.length > 0
       ? await generateMissionImage(missions, env)

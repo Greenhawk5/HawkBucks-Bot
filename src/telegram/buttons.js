@@ -82,14 +82,14 @@ function getFakeMissions() {
   ];
 }
 
-async function getMissionsForImage() {
+async function getMissionsForImage(env) {
   if (FORCE_FAKE_MISSIONS) {
     console.log("🧪 FORCE FAKE MISSIONS MODE ENABLED");
     return getFakeMissions();
   }
 
   console.log("🌐 REAL MISSION FETCH MODE ENABLED");
-  let missions = await getTodayVbucksMissions();
+  let missions = await getTodayVbucksMissions({ env });
   // Do not inject fallback missions when no real missions are found.
   // Return the real missions array (may be empty) so callers can handle the "no missions" case.
   return missions;
@@ -124,7 +124,7 @@ export async function sendDailyMissionImage(env, db, chatId, options = {}) {
 
     try {
       console.log("📥 FORCE MODE: fetching missions");
-      const missions = groupAndSortMissions(await getMissionsForImage());
+      const missions = groupAndSortMissions(await getMissionsForImage(env));
 
       console.log("🎨 FORCE MODE: generating new image", { missionCount: missions.length });
       const image = await generateMissionImage(missions, env);
@@ -193,7 +193,7 @@ export async function sendDailyMissionImage(env, db, chatId, options = {}) {
   try {
     console.log("❌ CACHE MISS", { date });
     console.log("📥 FETCHING MISSIONS");
-    const missions = groupAndSortMissions(await getMissionsForImage());
+    const missions = groupAndSortMissions(await getMissionsForImage(env));
 
     console.log("🎨 GENERATING NEW IMAGE", { missionCount: missions.length });
     const image = await generateMissionImage(missions, env);

@@ -7,16 +7,6 @@ const MISSION_PLACEHOLDERS = new Set([
   "na",
 ]);
 
-const CATEGORY_PLACEHOLDERS = new Set([
-  "",
-  "unknown",
-  "unknown category",
-  "no category",
-  "none",
-  "n a",
-  "na",
-]);
-
 export function normalizeText(text) {
   if (!text) return "";
 
@@ -53,13 +43,10 @@ export function isPlaceholderMissionType(type) {
   return MISSION_PLACEHOLDERS.has(comparisonText(type));
 }
 
-export function isPlaceholderCategory(category) {
-  return CATEGORY_PLACEHOLDERS.has(comparisonText(category));
-}
-
 /**
- * Cross-source comparison key. FortniteDB can label Fight the Storm as
- * "Category 4 Fight The Storm" while other sources only provide the base type.
+ * Comparison key for deduplication. Epic labels storm missions as
+ * "Category N Fight the Storm", so the category number is kept to
+ * distinguish Category 3 and Category 4 alerts.
  */
 export function missionTypeKey(type) {
   if (isPlaceholderMissionType(type)) return "";
@@ -68,27 +55,9 @@ export function missionTypeKey(type) {
   const isFightTheStorm = value.includes("fight the storm") ||
     (/\bcategory\s+\d+\s+storm\b/.test(value));
 
-  // Providers use several labels for the same mission family. Keep the
-  // category number when present so Category 3 and Category 4 remain distinct.
   if (isFightTheStorm) {
     return category ? `fight the storm category ${category[1]}` : "fight the storm";
   }
 
   return value.replace(/^category\s+\d+\s+/, "");
-}
-
-export function sourcePriority(source) {
-  const value = comparisonText(source);
-  if (value.includes("stwplanner")) return 3;
-  if (value.includes("freethevbucks")) return 2;
-  if (value.includes("fortnitedb")) return 1;
-  return 0;
-}
-
-export function missionQuality(mission) {
-  const type = mission?.mission?.type;
-  const category = mission?.mission?.category;
-  const typeScore = isPlaceholderMissionType(type) ? 0 : 20 + normalizeText(type).length;
-  const categoryScore = isPlaceholderCategory(category) ? 0 : 10 + normalizeText(category).length;
-  return typeScore + categoryScore;
 }
