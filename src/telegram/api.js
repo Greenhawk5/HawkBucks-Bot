@@ -1,4 +1,4 @@
-const TELEGRAM_API = "https://api.telegram.org";
+﻿const TELEGRAM_API = "https://api.telegram.org";
 
 
 export async function sendMessage(
@@ -24,7 +24,7 @@ export async function sendMessage(
 
 			chat_id: chatId,
 			text: text,
-			parse_mode: options.parse_mode || "MarkdownV2",
+			parse_mode: options.parse_mode === null ? undefined : (options.parse_mode || "MarkdownV2"),
 			...(options.reply_to_message_id ? { reply_to_message_id: options.reply_to_message_id } : {}),
 			reply_markup: options.reply_markup
 
@@ -101,6 +101,31 @@ export async function sendPhoto(
 
     return payload.result;
 
+}
+
+export async function sendDocument(env, chatId, document, filename, caption = "") {
+    const form = new FormData();
+    form.append("chat_id", chatId);
+    form.append("caption", caption);
+    form.append(
+        "document",
+        new Blob([document], { type: "application/pdf" }),
+        filename
+    );
+
+    const response = await fetch(
+        `${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`,
+        {
+            method: "POST",
+            body: form
+        }
+    );
+
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+        throw new Error(`Telegram sendDocument failed: ${payload.description || response.status}`);
+    }
+    return payload.result;
 }
 
 export async function deleteMessage(env, chatId, messageId) {

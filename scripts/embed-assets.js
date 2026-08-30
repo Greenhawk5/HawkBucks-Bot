@@ -18,7 +18,9 @@ const assets = {
     noMission: encode(`${root}/no-mission.png`),
     fonts: {
         inter: encode(`${root}/fonts/Inter.ttf`),
-        sora: encode(`${root}/fonts/Sora.ttf`)
+        sora: encode(`${root}/fonts/Sora.ttf`),
+    reportInter: encode(`${root}/fonts/Inter-Report.ttf`),
+    reportSora: encode(`${root}/fonts/Sora-Report.ttf`)
     },
 
     missions: {}

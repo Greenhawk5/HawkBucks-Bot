@@ -1,9 +1,16 @@
 async function upsertChat(db, table, chat) {
   await db.prepare(`
-    INSERT INTO ${table} (id, title, type, reminder_enabled)
-    VALUES (?, ?, ?, 1)
-    ON CONFLICT(id) DO UPDATE SET title = excluded.title, type = excluded.type
+    INSERT INTO ${table} (id, title, type, reminder_enabled, last_seen)
+    VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET title = excluded.title, type = excluded.type,
+      last_seen = CURRENT_TIMESTAMP
   `).bind(String(chat.id), chat.title || null, chat.type).run();
+}
+
+export function touchChat(db, table, chatId) {
+  if (!["groups", "channels"].includes(table)) return Promise.resolve();
+  return db.prepare(`UPDATE ${table} SET last_seen = CURRENT_TIMESTAMP WHERE id = ?`)
+    .bind(String(chatId)).run();
 }
 
 export function upsertGroup(db, chat) {

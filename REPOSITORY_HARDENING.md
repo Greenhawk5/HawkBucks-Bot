@@ -172,3 +172,32 @@ A repository change should not be considered complete if it introduces:
 - undocumented production configuration.
 
 Security is part of the implementation, not a final cleanup step.
+
+## 13. Admin / D1 / Broadcast Notes (v1.1.x)
+
+The v1.1.x series introduced an Admin Panel and related persistence and
+delivery changes. Include the following review points when preparing a
+release or validating production configuration:
+
+- Legacy hardcoded administrator IDs have been removed. Administrative access
+	is now authorized exclusively via the `ADMIN_TELEGRAM_ID` Cloudflare Worker
+	Secret. Never commit real administrator IDs to the repository.
+- D1 schema additions include `admin_sessions` and `broadcast_history`. These
+	tables persist session and broadcast metadata; they do not contain message
+	bodies or secret values.
+- Broadcast delivery is validated server-side, enforces a hard cap of 45
+	recipients per broadcast, and uses `ctx.waitUntil()` to perform background
+	delivery. The recipient list is resolved from D1 at send time and client
+	inputs are not treated as authoritative.
+- A migration file `database/migrations/0002_chat_last_seen.sql` upgrades the
+	v1.0.0 schema to include `groups.last_seen` and `channels.last_seen`. For
+	production upgrades run the explicit remote migration command documented
+	in the release notes rather than running ad-hoc migrations inside request
+	handlers.
+
+## 14. Secret handling reminder
+
+- Use `npx wrangler secret put ADMIN_TELEGRAM_ID` or the Cloudflare dashboard to
+	provision the admin secret. Example development placeholders may appear in
+	`.env.example` but should never be replaced with real values in tracked
+	files.

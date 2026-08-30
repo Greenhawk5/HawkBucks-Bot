@@ -68,7 +68,8 @@ export async function toggleReminder(db, telegramId) {
 		.prepare(
 			`
 			UPDATE users
-			SET reminder_enabled = ?
+			SET reminder_enabled = ?,
+				last_seen = CURRENT_TIMESTAMP
 			WHERE telegram_id = ?
 			`
 		)

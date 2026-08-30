@@ -1,5 +1,6 @@
+import { isAdmin } from "../config/admin.js";
 import { answerCallbackQuery, deleteMessage, editMessageText, getChatMember, sendMessage } from "./api.js";
-import { createPanelSession, deleteChannel, deleteGroup, deletePanelSession, disableGroupReminder, enableGroupReminder, getPanelSession, getPanelSessionForCleanup, getReminderStatus, refreshPanelSession, upsertChannel, upsertGroup } from "../../database/groups.js";
+import { createPanelSession, deleteChannel, deleteGroup, deletePanelSession, disableGroupReminder, enableGroupReminder, getPanelSession, getPanelSessionForCleanup, getReminderStatus, refreshPanelSession, touchChat, upsertChannel, upsertGroup } from "../../database/groups.js";
 import {
   GROUP_WELCOME_MESSAGE,
   GROUP_PANEL_MESSAGE,
@@ -7,8 +8,6 @@ import {
   PANEL_EXPIRED_MESSAGE,
   PANEL_FOREIGN_MESSAGE,
 } from "./messages.js";
-
-export const BOT_OWNER_ID = ["6726776142", "184202422"];
 
 export function groupPanelKeyboard(enabled) {
   return {
@@ -114,9 +113,9 @@ export async function handleMyChatMember(env, update) {
 export async function handlePanelCommand(env, db, message, ctx) {
   const chat = message.chat;
   if (!chat || !["group", "supergroup"].includes(chat.type)) return false;
-  const isOwner = BOT_OWNER_ID.includes(String(message.from?.id));
-  const isAdmin = isOwner || await isGroupAdmin(env, chat.id, message.from.id);
-  if (!isAdmin) return { handled: true, denied: true };
+  const isOwner = isAdmin(env, message.from?.id);
+  const isAdminUser = isOwner || await isGroupAdmin(env, chat.id, message.from.id);
+  if (!isAdminUser) return { handled: true, denied: true };
 
   const enabled = (await getReminderStatus(db, chat.id)) !== false;
   const sent = await sendMessage(env, chat.id, GROUP_PANEL_MESSAGE(enabled), {

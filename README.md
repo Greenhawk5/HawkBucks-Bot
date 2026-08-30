@@ -248,6 +248,28 @@ The Telegram layer is separated into dedicated modules for:
 
 ---
 
+## 👑 Admin Panel
+
+HawkBucks Bot includes a private, administrator-only control panel for monitoring and operating the bot directly from Telegram.
+
+The Admin Panel is available only to the administrator configured through the `ADMIN_TELEGRAM_ID` Cloudflare Worker Secret and is restricted to private chats.
+
+It currently provides:
+
+* 📊 **Usage Statistics** — daily, weekly, monthly, 6-month, and 12-month reports.
+* 🔔 **Active Reminders** — inspect users, groups, and channels with reminders enabled.
+* 📨 **Broadcast Messages** — select recipients by type and filter them by reminder status or recent activity.
+* 📄 **PDF Reports** — generate structured administrative reports with summary cards, activity tables, pagination, and embedded report fonts.
+* 🛡️ **Server-side authorization** — administrative callbacks are verified independently of the Telegram UI.
+
+Broadcast delivery is designed for Cloudflare Workers' execution model: the webhook acknowledges the interaction immediately while the actual recipient delivery continues through `ctx.waitUntil()`. Delivery is isolated per recipient and failures do not stop the remaining recipients.
+
+Custom broadcasts currently support **users and groups**. Telegram channels are intentionally excluded from custom broadcasts because they receive the scheduled daily reminder automatically.
+
+The current free-plan implementation limits a single custom broadcast to **45 recipients**.
+
+---
+
 ## 🗄️ Persistent Storage
 
 Cloudflare D1 is used as the bot's persistent database.
@@ -260,6 +282,8 @@ The database stores application state such as:
 * Reminder runs
 * Mission image cache
 * Panel sessions
+* Admin sessions
+* Broadcast history
 
 This allows the Worker to remain lightweight while persistent configuration and runtime state are stored separately.
 
@@ -336,6 +360,8 @@ The bot supports different commands depending on the type of Telegram conversati
 | `/vbuck` | Request the current V-Bucks mission reminder immediately.       |
 
 The bot also supports interactive callback buttons for parts of the Telegram interface.
+
+The private-chat interface additionally exposes an **👑 Admin** entry point to the configured administrator. Administrative callback actions are authorized server-side and are not available to ordinary users.
 
 ---
 
@@ -427,6 +453,8 @@ Contains reusable application services such as:
 * Notifications
 * Screenshot generation
 * Recipient discovery
+* Broadcast delivery
+* PDF report generation
 * Mission preparation
 * Telegram communication
 
@@ -444,6 +472,8 @@ Provides D1 access for:
 * Cached mission images
 * Reminder execution state
 * Panel sessions
+* Admin sessions
+* Broadcast history
 
 ### 7. Rendering Layer
 
@@ -530,13 +560,14 @@ HawkBucks-Bot/
 │   └── no mission.jpg
 │
 ├── database/
-│   ├── channels.js
-│   ├── groups.js
-│   ├── mission-images.js
-│   ├── reminder-runs.js
+│   ├── admin-sessions.js
+│   ├── broadcasts.js
+│   ├── migrations/
+│   ├── recipients.js
 │   ├── schema.sql
-│   ├── users.js
-│   └── ...
+│   ├── stats.js
+│   ├── groups.js
+│   └── users.js
 │
 ├── scripts/
 │   ├── deploy-d1-schema.js
@@ -545,6 +576,7 @@ HawkBucks-Bot/
 │
 ├── src/
 │   ├── config/
+│   │   └── admin.js
 │   │
 │   ├── jobs/
 │   │   └── dailyReminder.js
@@ -564,8 +596,12 @@ HawkBucks-Bot/
 │   ├── render/
 │   │
 │   ├── services/
+│   │   ├── broadcast.js
+│   │   └── pdf.js
 │   │
 │   ├── telegram/
+│   │   ├── admin-broadcast.js
+│   │   ├── admin-panel.js
 │   │   ├── api.js
 │   │   ├── buttons.js
 │   │   ├── command-parser.js
@@ -576,11 +612,20 @@ HawkBucks-Bot/
 │   │
 │   ├── templates/
 │   │   ├── fonts/
+│   │   │   ├── Inter-Report.ttf
+│   │   │   └── Sora-Report.ttf
 │   │   └── missions/
 │   │
 │   └── index.js
 │
 ├── test/
+│   ├── admin-broadcast.test.js
+│   ├── admin-core.test.js
+│   ├── admin-data.test.js
+│   ├── callback-dispatch.test.js
+│   ├── migration.test.js
+│   ├── recipients.test.js
+│   └── helpers/
 │
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
@@ -739,7 +784,22 @@ npm run deploy:d1
 npm run deploy:full
 ```
 
-The full deployment workflow is intended to prepare required assets, deploy the D1 schema, and deploy the Worker.
+For an existing production database being upgraded from the v1.0.0 baseline, apply the migration explicitly before deploying the Worker:
+
+```bash
+npx wrangler d1 execute hawkbucks-db --file database/migrations/0002_chat_last_seen.sql --remote
+npm run deploy
+```
+
+The migration is non-destructive and adds the D1 structures required by the v1.1.x Admin Panel and activity tracking.
+
+For a fresh database, apply the complete schema with:
+
+```bash
+npm run deploy:d1
+```
+
+Always review the migration and production database state before executing database changes.
 
 ---
 
@@ -750,6 +810,7 @@ HawkBucks Bot requires runtime configuration that must **not** be committed to s
 Depending on the deployment configuration, this may include:
 
 * Telegram Bot Token
+* Admin Panel: ADMIN_TELEGRAM_ID (numeric Telegram user ID of the primary administrator; provision as a Cloudflare Worker Secret; required for Admin Panel access; never commit the real value)
 * Epic account/device credentials
 * Epic token authentication credential
 * ScreenshotOne credentials
@@ -785,7 +846,7 @@ and:
 
 The project includes a testing foundation based on **Vitest** as well as dedicated deployment validation tooling.
 
-The current test suite covers important parts of the Epic API migration and application behavior, including:
+The current test suite covers important parts of the application, including:
 
 * Epic API client behavior
 * Authentication and API failures
@@ -796,6 +857,13 @@ The current test suite covers important parts of the Epic API migration and appl
 * Mission organization
 * Reminder-related services
 * Telegram output formatting
+* Admin authorization and callback dispatch
+* Broadcast recipient selection, filtering, caps, and delivery
+* D1 migrations and schema safety
+* PDF generation, font embedding, text extraction, and layout geometry
+* Regression coverage for production bugs fixed during development
+
+The full suite currently passes **78/78 tests**.
 
 The intended development workflow is:
 
@@ -824,17 +892,11 @@ Tests should be updated when behavior changes, especially around:
 
 # 📦 Mission Data Sources
 
-HawkBucks Bot contains integrations for several external mission-data sources.
+The production mission-acquisition path uses the **official Epic Games API**.
 
-The mission layer includes dedicated modules for:
+The repository may retain adapters or resolver code for external mission-data services for compatibility, fallback behavior, or future development, but the primary production acquisition path is intentionally based on Epic's official service rather than scraping third-party websites.
 
-* **STW Planner**
-* **FortniteDB**
-* **FreeTheVbucks**
-
-These sources are processed independently before their results are merged into the internal mission representation.
-
-This makes it possible to evolve individual source integrations without tightly coupling them to Telegram functionality.
+This separation keeps source-specific acquisition logic independent from the normalized mission model and Telegram delivery layer.
 
 ---
 
@@ -857,7 +919,97 @@ The database schema is maintained under:
 database/schema.sql
 ```
 
+Incremental production migrations are maintained under:
+
+```text
+database/migrations/
+```
+
+The v1.1.x migration adds activity timestamps for groups/channels and the persistent Admin Panel tables without deleting or rewriting existing application data.
+
 Database access is kept separate from Telegram handlers so persistence logic remains reusable across the application.
+
+---
+
+# 👑 Admin Operations
+
+The Admin Panel is designed around a small set of safe operational workflows.
+
+### Usage Statistics
+
+```text
+Admin
+  ↓
+Usage Statistics
+  ↓
+Select period
+  ↓
+Query D1 activity data
+  ↓
+Generate PDF report
+  ↓
+Send report in Telegram
+```
+
+Supported periods are:
+
+* Today
+* Current Week
+* Current Month
+* Last 6 Months
+* Last 12 Months
+
+### Active Reminders
+
+The Active Reminders report summarizes recipients whose reminder setting is enabled and separates activity by recipient type.
+
+### Custom Broadcast
+
+```text
+Admin
+  ↓
+Broadcast Message
+  ↓
+Users / Groups
+  ↓
+Select filter
+  ↓
+Select recipients
+  ↓
+Preview
+  ↓
+Confirm
+  ↓
+ctx.waitUntil(background delivery)
+  ↓
+Per-recipient delivery + summary
+```
+
+Recipient selection is revalidated server-side at send time, so the UI cannot bypass the 45-recipient limit.
+
+Broadcast history stores delivery metadata rather than the message content.
+
+---
+
+# 📄 Administrative PDF Reports
+
+The Admin Panel can generate PDF reports directly inside Telegram.
+
+The report renderer is designed specifically for Worker-compatible execution and includes:
+
+* Branded HawkBucks green/forest visual styling
+* Summary cards for key counts
+* Activity tables for users, groups, and channels
+* Reminder-status reporting
+* Repeating table headers across pages
+* Wrapped long values without row overlap
+* Embedded Inter and Sora report fonts
+* PDF `ToUnicode` mappings for reliable text extraction
+* Page numbering and report metadata
+
+The renderer currently supports Latin, Latin-Extended, Greek, and Cyrillic text through the bundled report font subsets.
+
+**Persian/Arabic text remains a known limitation:** the current lightweight renderer does not include an Arabic shaping engine and the bundled report subsets do not contain Arabic glyphs, so unsupported Arabic/Persian characters are rendered as placeholders. Telegram messages themselves are unaffected.
 
 ---
 
@@ -1082,13 +1234,15 @@ Project changes are documented in:
 
 The changelog follows a structure inspired by **Keep a Changelog**, with version information maintained as the project evolves.
 
-The current documented baseline is:
+The current release baseline is:
 
 ```text
-0.1.0
+1.1.1
 ```
 
-Future releases may use Semantic Versioning where practical.
+The project follows Semantic Versioning for releases where practical.
+
+Version 1.1.1 includes the production Admin Panel, D1 activity tracking and migrations, recipient filtering and broadcast delivery, PDF administrative reports, regression tests, and related deployment hardening.
 
 ---
 
@@ -1150,6 +1304,14 @@ Potential future improvements include:
 * [ ] Expanded documentation
 
 The roadmap may change as the bot and the wider HawkBucks ecosystem evolve.
+
+Completed in the current 1.1.x line:
+
+* [x] Private administrator-only Admin Panel
+* [x] Usage and active-reminder PDF reports
+* [x] Filtered custom broadcasts with server-side recipient limits
+* [x] D1 migration support for activity and Admin Panel state
+* [x] Regression coverage for the production callback and broadcast paths
 
 ---
 

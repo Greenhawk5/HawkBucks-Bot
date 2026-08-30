@@ -70,6 +70,40 @@ Security concerns may include:
 - Cloudflare deployment/configuration weaknesses.
 - Public endpoints that expose sensitive operations.
 
+## Admin Panel & Secrets
+
+- The Admin Panel is protected by a single Cloudflare Worker secret: `ADMIN_TELEGRAM_ID`.
+	This secret must be provisioned via `npx wrangler secret put ADMIN_TELEGRAM_ID` (or the
+	Cloudflare dashboard) and must never be committed into source control.
+- The Worker configuration **fails closed** for admin features: if `ADMIN_TELEGRAM_ID`
+	is missing or invalid, administrator-only features are disabled and `isAdmin()`
+	will return false for all requests. Do not rely on client-side visibility for
+	security (Telegram UI is not a security boundary).
+- Every incoming admin callback is re-validated server-side against the configured
+	secret and is only accepted from private chats. Callback payloads are not
+	trusted to identify administrator intent — the sender is always rechecked.
+
+## Broadcasts and Recipient Handling
+
+- Broadcast delivery is performed server-side and uses `ctx.waitUntil()` for
+	background deliveries. The code enforces a server-side maximum recipient cap
+	(45 recipients) — this limit is authoritative and cannot be bypassed from the
+	client/UI.
+- Recipient identifiers are resolved from the D1 database at send-time; callback
+	or client-provided recipient data is not trusted as the canonical source of
+	truth.
+- Broadcast history (`broadcast_history`) stores delivery metadata only (status,
+	recipient id, timestamps) and does not retain message content or secrets.
+
+## Logging and Secrets
+
+- Do not log the value of `ADMIN_TELEGRAM_ID` or any other secret. The code
+	intentionally logs only non-sensitive configuration flags (for example,
+	`ADMIN_CONFIG_INVALID: { configured: false }`) when the admin secret is
+	missing or malformed.
+- If a secret is exposed, rotate/revoke it immediately and follow incident
+	response procedures in this document.
+
 ## Safe Harbor
 
 Good-faith security research intended to identify and responsibly report

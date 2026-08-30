@@ -1,5 +1,8 @@
 import { sendMessage } from "./api.js";
 import { createUser, getUser } from "../../database/users.js";
+import { touchChat } from "../../database/groups.js";
+import { handleAdminButton, handleAdminTextInput } from "./admin-panel.js";
+import { isAdmin } from "../config/admin.js";
 import { getMainKeyboard } from "./keyboards.js";
 import { handleButton } from "./buttons.js";
 import { sendMissionReminder } from "../services/notification.js";
@@ -31,6 +34,9 @@ export async function handleCommand(
 
 		if (isButton) return true;
 
+		// Admin broadcast flow: consume the admin's message content before
+		// any command interpretation (admin-only, verified internally).
+		if (await handleAdminTextInput(env, db, message)) return true;
 
 	if (command === "start") {
 		// Read the existing record first so /start never resets a saved
@@ -56,7 +62,7 @@ export async function handleCommand(
 			START_MESSAGE,
 			{
 				reply_markup: getMainKeyboard(
-					false,
+					isAdmin(env, message.from.id),
 					existingUser ? existingUser.reminder_enabled === 1 : true
 				)
 			}
@@ -71,7 +77,7 @@ export async function handleCommand(
 		const existingUser = await getUser(db, message.from.id);
 		await sendMessage(env, chatId, RESTART_MESSAGE, {
 			reply_markup: getMainKeyboard(
-				false,
+				isAdmin(env, message.from.id),
 				existingUser ? existingUser.reminder_enabled === 1 : true
 			)
 		});
@@ -104,6 +110,7 @@ export async function handleCommand(
 			return true;
 		}
 
+		touchChat(db, "groups", chatId).catch(() => {});
 		if (command === "vbuck") {
 			await sendMissionReminder(chatId, env, db, {
 				replyToMessageId: message.message_id,

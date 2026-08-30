@@ -164,17 +164,122 @@ export const GENERIC_ERROR_MESSAGE = [
   text("Please try again later.")
 ].join("\n");
 
-export const OWNER_PANEL_MESSAGE = [
-  bold("👑 HawkBucks Owner Panel"),
+// ---------- Admin Panel ----------
+
+export function adminPanelText() {
+  return [
+    bold("👑 Admin Panel"),
+    "",
+    text("Select a section:")
+  ].join("\n");
+}
+
+export function adminPanelKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "📊 Usage Statistics", callback_data: "admin:usage" }],
+      [{ text: "🔔 Active Reminders", callback_data: "admin:rem" }],
+      [{ text: "📨 Broadcast Message", callback_data: "admin:bc" }],
+      [{ text: "🔙 Back", callback_data: "admin:root:back" }],
+    ],
+  };
+}
+
+export const ADMIN_ACCESS_DENIED_MESSAGE = [
+  bold("⚠️ Access denied."),
   "",
-  text("Manage bot settings and monitoring tools.")
+  text("This action is restricted.")
 ].join("\n");
 
-export const ADMIN_PANEL_MESSAGE = [
-  bold("🛠 HawkBucks Admin Panel"),
+export const ADMIN_PANEL_CLOSED_MESSAGE = text("👑 Admin panel closed.");
+
+export function adminUsagePeriodsKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "📅 Today", callback_data: "admin:usage:day" }, { text: "🗓 Current Week", callback_data: "admin:usage:week" }],
+      [{ text: "📆 Current Month", callback_data: "admin:usage:month" }],
+      [{ text: "📈 Last 6 Months", callback_data: "admin:usage:6months" }, { text: "🗓 Last 12 Months", callback_data: "admin:usage:year" }],
+      [{ text: "🔙 Back", callback_data: "admin:root" }],
+    ],
+  };
+}
+
+export function adminUsagePeriodText(period, stats) {
+  const labels = {
+    day: "Today",
+    week: "Current Week",
+    month: "Current Month",
+    "6months": "Last 6 Months",
+    year: "Last 12 Months",
+  };
+  return [
+    bold(`📊 Usage Statistics — ${labels[period] || period}`),
+    "",
+    `${text("👤 Users:")} ${text(stats.users)}`,
+    `${text("👥 Groups:")} ${text(stats.groups)}`,
+    `${text("📢 Channels:")} ${text(stats.channels)}`,
+    "",
+    `${text("📈 Total:")} ${text(stats.total)}`,
+    "",
+    text("📎 Export PDF available below."),
+  ].join("\n");
+}
+
+export function adminUsageStatsKeyboard(period) {
+  return {
+    inline_keyboard: [
+      [{ text: "📎 Export PDF", callback_data: `admin:usage:pdf:${period}` }],
+      [{ text: "🔙 Back", callback_data: "admin:usage" }],
+    ],
+  };
+}
+
+export function adminRemindersKeyboard(counts) {
+  return {
+    inline_keyboard: [
+      [{ text: `👤 Users (${counts.users})`, callback_data: "admin:rem:users:p0" }],
+      [{ text: `👥 Groups (${counts.groups})`, callback_data: "admin:rem:groups:p0" }],
+      [{ text: `📢 Channels (${counts.channels})`, callback_data: "admin:rem:channels:p0" }],
+      [{ text: "📎 Export PDF", callback_data: "admin:rem:pdf" }],
+      [{ text: "🔙 Back", callback_data: "admin:root" }],
+    ],
+  };
+}
+
+export function adminRemindersText(counts) {
+  return [
+    bold("🔔 Active Reminders"),
+    "",
+    `${text("👤 Users:")} ${text(counts.users)}`,
+    `${text("👥 Groups:")} ${text(counts.groups)}`,
+    `${text("📢 Channels:")} ${text(counts.channels)}`,
+    "",
+    text("Select a category to view recipients."),
+  ].join("\n");
+}
+
+export function adminReminderListKeyboard(category, page, hasPrev, hasNext) {
+  const nav = [];
+  if (hasPrev) nav.push({ text: "⬅️ Previous", callback_data: `admin:rem:${category}:p${page - 1}` });
+  if (hasNext) nav.push({ text: "➡️ Next", callback_data: `admin:rem:${category}:p${page + 1}` });
+  return {
+    inline_keyboard: [
+      ...(nav.length ? [nav] : []),
+      [{ text: "🔙 Back", callback_data: "admin:rem" }],
+    ],
+  };
+}
+
+export const ADMIN_EMPTY_STATE_PREFIX = text("No active reminders in this category.");
+
+export const ADMIN_PDF_FAILED_MESSAGE = text("⚠️ PDF export failed. Please try again later.");
+
+export const ADMIN_BROADCAST_STARTED_MESSAGE = [
+  bold("📨 Broadcast started."),
   "",
-  text("Manage group settings and bot features.")
+  text("You will receive a summary when it completes.")
 ].join("\n");
+
 
 export const PANEL_PERMISSION_MESSAGE = text("You don't have permission to use this panel.");
 // Callback alerts are not parsed with MarkdownV2, so keep these values plain.

@@ -1,6 +1,7 @@
 import { handleCommand } from "./telegram/commands.js";
 import { generateScreenshot } from "./services/screenshot.js";
 import { handleMyChatMember, handlePanelCallback } from "./telegram/groups.js";
+import { handleAdminCallback } from "./telegram/admin-panel.js";
 import { runDailyReminder } from "./jobs/dailyReminder.js";
 
 
@@ -105,7 +106,15 @@ export default {
 				}
 
 				if (update.callback_query) {
-					await handlePanelCallback(env, env.hawkbucks_db, update.callback_query, ctx);
+					const callbackData = update.callback_query?.data || "";
+
+					if (callbackData.startsWith("admin:")) {
+						// Admin Panel router (verifies the sender itself, fails closed).
+						await handleAdminCallback(env, env.hawkbucks_db, update.callback_query, ctx);
+					} else {
+						// Existing group panel router (group_panel:*).
+						await handlePanelCallback(env, env.hawkbucks_db, update.callback_query, ctx);
+					}
 				}
 
 

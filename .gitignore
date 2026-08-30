@@ -171,8 +171,12 @@ test.css
 test.html
 test/*
 !test/*.test.js
+!test/fixtures/
 !test/fixtures/**
+!test/helpers/
+!test/helpers/**
 vitest.config.js
 epic-web
+backup-*.sql
 !test/*.test.js
 !test/fixtures/

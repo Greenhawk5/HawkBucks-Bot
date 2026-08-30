@@ -7,6 +7,8 @@ import {
   storeMissionImage,
 } from "../../database/mission-images.js";
 import { getMainKeyboard } from "./keyboards.js";
+import { handleAdminButton } from "./admin-panel.js";
+import { isAdmin } from "../config/admin.js";
 import { getTodayVbucksMissions } from "../missions/service.js";
 import { formatMissionMessage } from "./formatter.js";
 import { generateMissionImage } from "../services/mission-image.js";
@@ -15,7 +17,6 @@ import { sendMissionReminder } from "../services/notification.js";
 import {
   ADD_TO_GROUP_PROMPT,
   GENERIC_ERROR_MESSAGE,
-  OWNER_PANEL_MESSAGE,
   REMINDER_DISABLED_MESSAGE,
   REMINDER_ENABLED_MESSAGE,
   SUPPORT_MESSAGE,
@@ -230,7 +231,7 @@ export async function handleButton(env, db, message) {
       const statusText = newStatus === 1 ? REMINDER_ENABLED_MESSAGE : REMINDER_DISABLED_MESSAGE;
 
       await sendMessage(env, chatId, statusText, {
-        reply_markup: getMainKeyboard(false, newStatus === 1),
+        reply_markup: getMainKeyboard(isAdmin(env, message.from?.id), newStatus === 1),
       });
       break;
     }
@@ -251,8 +252,9 @@ export async function handleButton(env, db, message) {
       await sendMessage(env, chatId, SUPPORT_MESSAGE);
       break;
 
-    case "👑 Owner Panel":
-      await sendMessage(env, chatId, OWNER_PANEL_MESSAGE);
+    case "👑 Admin":
+      // Authorization is performed inside (fails closed for non-admins).
+      await handleAdminButton(env, db, message);
       break;
 
     default:

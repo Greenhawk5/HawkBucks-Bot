@@ -1,11 +1,21 @@
-export function getMainKeyboard(isOwner = false, reminderEnabled = true) {
+export function getMainKeyboard(isAdminUser = false, reminderEnabled = true) {
 
 	const reminderStatus = reminderEnabled
 		? "🟢 Daily Reminder"
 		: "🔴 Daily Reminder";
 
+	const keyboard = [];
 
-	const keyboard = [
+	// Admin-only row: never rendered for normal users.
+	if (isAdminUser) {
+		keyboard.push([
+			{
+				text: "👑 Admin"
+			}
+		]);
+	}
+
+	keyboard.push(
 		[
 			{
 				text: "💰 V-Bucks Missions"
@@ -24,19 +34,7 @@ export function getMainKeyboard(isOwner = false, reminderEnabled = true) {
 				text: "💚 Support"
 			}
 		]
-	];
-
-
-	if (isOwner) {
-
-		keyboard.push([
-			{
-				text: "👑 Owner Panel"
-			}
-		]);
-
-	}
-
+	);
 
 	return {
 		keyboard,
