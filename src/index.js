@@ -3,13 +3,22 @@ import { generateScreenshot } from "./services/screenshot.js";
 import { handleMyChatMember, handlePanelCallback } from "./telegram/groups.js";
 import { handleAdminCallback } from "./telegram/admin-panel.js";
 import { runDailyReminder } from "./jobs/dailyReminder.js";
+import { DAILY_REMINDER_DELAY_MS } from "./config/reminders.js";
 
 
 export default {
 
 	async scheduled(event, env, ctx) {
 		console.log("CRON_TRIGGER_RECEIVED", { cron: event.cron });
-		ctx.waitUntil(runDailyReminder(env));
+		ctx.waitUntil((async () => {
+			// The new day starts at 00:00:00 UTC; the cron has minute
+			// granularity, so the intended 00:00:30 UTC execution point is
+			// reached with a fixed 30-second delay inside waitUntil.
+			if (DAILY_REMINDER_DELAY_MS > 0) {
+				await new Promise((resolve) => setTimeout(resolve, DAILY_REMINDER_DELAY_MS));
+			}
+			await runDailyReminder(env);
+		})());
 	},
 
 	async fetch(request, env, ctx) {

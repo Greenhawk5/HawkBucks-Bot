@@ -180,3 +180,5 @@ epic-web
 backup-*.sql
 !test/*.test.js
 !test/fixtures/
+
+note.txt

@@ -15,6 +15,7 @@ import {
   getPowerLevel,
   getTheaterName,
   getZoneName,
+  isPowerLevelValidForTheater,
 } from "./mappings.js";
 
 export const VBUCKS_ITEM_TYPE = "AccountResource:currency_mtxswap";
@@ -110,9 +111,29 @@ export function parseWorldInfo(worldData, lang = "en") {
         const missionGenerator = availableMission.missionGenerator;
 
         const missionType = getMissionName(missionGenerator, lang);
+        const difficultyRow =
+          typeof availableMission.missionDifficultyInfo === "string"
+            ? availableMission.missionDifficultyInfo
+            : availableMission.missionDifficultyInfo?.rowName || null;
         const powerLevel = getPowerLevel(
           availableMission.missionDifficultyInfo
         );
+
+        // Sanity check: the difficulty row must be valid for the theater the
+        // mission was reported in. A failure here means the resolved Power
+        // Level likely belongs to another theater (association bug) or the
+        // difficulty tables changed — surface it loudly instead of silently
+        // emitting a suspicious value.
+        if (
+          powerLevel !== null &&
+          !isPowerLevelValidForTheater(powerLevel, zone)
+        ) {
+          console.error(
+            `POWER_LEVEL_THEATER_MISMATCH { theater: ${JSON.stringify(zone)}, ` +
+              `powerLevel: ${powerLevel}, mission: ${JSON.stringify(missionType)}, ` +
+              `difficultyRow: ${JSON.stringify(difficultyRow)} }`
+          );
+        }
 
         const resultKey =
           `${missionAlert.theaterId || i}:${tileIndex}:${quantity}:` +
@@ -128,6 +149,7 @@ export function parseWorldInfo(worldData, lang = "en") {
           rewardAmount: quantity,
           missionType,
           powerLevel,
+          difficultyRow,
         }));
 
         resultKeys.add(resultKey);
@@ -138,7 +160,7 @@ export function parseWorldInfo(worldData, lang = "en") {
   return results;
 }
 
-function createMission({ zone, category, rewardAmount, missionType, powerLevel }) {
+function createMission({ zone, category, rewardAmount, missionType, powerLevel, difficultyRow }) {
   return {
     zone,
     powerLevel,
@@ -149,6 +171,7 @@ function createMission({ zone, category, rewardAmount, missionType, powerLevel }
     mission: {
       type: missionType,
       category,
+      difficultyRow,
     },
   };
 }

@@ -2,55 +2,76 @@
 // (epic/index.js). These translate raw Epic Games world-info identifiers into
 // the human-readable values users expect.
 
-export const DIFFICULTY_POWER_MAP = {
-  Theater_Start_Zone1: 1,
-  Theater_Start_Zone2: 3,
-  Theater_Start_Zone3: 5,
-  Theater_Start_Zone4: 9,
-  Theater_Start_Zone5: 15,
+// ---------------------------------------------------------------------------
+// Power Level resolution
+//
+// Every mission in Epic's world-info payload carries
+// `missionDifficultyInfo = { dataTable, rowName }`. The `rowName` (for example
+// "Theater_Hard_Zone2") names a row in Epic's internal
+// `GameDifficultyGrowthBounds` DataTable, and the row defines the displayed
+// Power Level ("threat level") of that mission tier.
+//
+// Power Levels are therefore a property of (difficulty family, zone index),
+// NOT of the individual mission, the zone theme, or the tile. Epic's data
+// table has been retuned over the years (Canny Valley was rebalanced from six
+// tiers 40-70 to five tiers 46-70), so the values below MUST track Epic's
+// DataTable. They were verified against live mission alert listings
+// (STW Planner, Sept 2026):
+//
+//   Stonewood   (Theater_Start_*)     : 1, 3, 5, 9, 15
+//   Plankerton  (Theater_Normal_*)    : 19, 23, 28, 34, 40
+//   Canny Valley (Theater_Hard_*)     : 46, 52, 58, 64, 70
+//   Twine Peaks (Theater_Nightmare_*) : 76, 82, 88, 94, 100
+//   Ventures    (Theater_Endgame_*)   : 108, 116, 124, 132, 140 (160 exists
+//                                        only on Group rows: Zone6 = 160)
+//   Ventures legacy "Phoenix" rows    : 1 ... 140
+//
+// The expected theater for each family lets the parser detect missions whose
+// difficulty row disagrees with the theater Epic placed them in (which would
+// indicate a data/association problem) instead of silently emitting a value.
+// ---------------------------------------------------------------------------
+export const DIFFICULTY_FAMILIES = [
+  {
+    family: "Theater_Start",
+    expectedTheater: "Stonewood",
+    powerLevels: [1, 3, 5, 9, 15],
+  },
+  {
+    family: "Theater_Normal",
+    expectedTheater: "Plankerton",
+    powerLevels: [19, 23, 28, 34, 40],
+  },
+  {
+    family: "Theater_Hard",
+    expectedTheater: "Canny Valley",
+    powerLevels: [46, 52, 58, 64, 70],
+  },
+  {
+    family: "Theater_Nightmare",
+    expectedTheater: "Twine Peaks",
+    powerLevels: [76, 82, 88, 94, 100],
+  },
+  {
+    family: "Theater_Endgame",
+    expectedTheater: null, // Ventures zones can appear in any theater
+    powerLevels: [108, 116, 124, 132, 140, 160],
+  },
+  {
+    family: "Theater_Phoenix",
+    expectedTheater: null,
+    powerLevels: [1, 3, 5, 10, 15, 23, 34, 46, 58, 70, 82, 94, 108, 124, 140],
+  },
+];
 
-  Theater_Normal_Zone1: 19,
-  Theater_Normal_Zone2: 23,
-  Theater_Normal_Zone3: 28,
-  Theater_Normal_Zone4: 34,
-  Theater_Normal_Zone5: 40,
-
-  Theater_Hard_Zone1: 40,
-  Theater_Hard_Zone2: 46,
-  Theater_Hard_Zone3: 52,
-  Theater_Hard_Zone4: 58,
-  Theater_Hard_Zone5: 64,
-  Theater_Hard_Zone6: 70,
-
-  Theater_Nightmare_Zone1: 76,
-  Theater_Nightmare_Zone2: 82,
-  Theater_Nightmare_Zone3: 88,
-  Theater_Nightmare_Zone4: 94,
-  Theater_Nightmare_Zone5: 100,
-
-  Theater_Endgame_Zone1: 108,
-  Theater_Endgame_Zone2: 116,
-  Theater_Endgame_Zone3: 124,
-  Theater_Endgame_Zone4: 132,
-  Theater_Endgame_Zone5: 140,
-  Theater_Endgame_Zone6: 160,
-
-  Theater_Phoenix_Zone1: 1,
-  Theater_Phoenix_Zone2: 3,
-  Theater_Phoenix_Zone3: 5,
-  Theater_Phoenix_Zone4: 10,
-  Theater_Phoenix_Zone5: 15,
-  Theater_Phoenix_Zone6: 23,
-  Theater_Phoenix_Zone7: 34,
-  Theater_Phoenix_Zone8: 46,
-  Theater_Phoenix_Zone9: 58,
-  Theater_Phoenix_Zone10: 70,
-  Theater_Phoenix_Zone11: 82,
-  Theater_Phoenix_Zone12: 94,
-  Theater_Phoenix_Zone13: 108,
-  Theater_Phoenix_Zone14: 124,
-  Theater_Phoenix_Zone15: 140,
-};
+export const POWER_LEVEL_BANDS = Object.fromEntries(
+  DIFFICULTY_FAMILIES.map(({ expectedTheater, powerLevels }) => [
+    expectedTheater,
+    {
+      min: Math.min(...powerLevels),
+      max: Math.max(...powerLevels),
+    },
+  ]).filter(([theater]) => theater)
+);
 
 export const ZONE_MAP = {
   ZT_GhostTown: "Ghost Town",
@@ -146,18 +167,110 @@ export function getMissionName(missionGenerator, lang = "en") {
   return "Unknown Mission";
 }
 
+const ROW_NAME_PATTERN = /^(.*[^\d])_Zone(\d+)$/;
+
+/**
+ * Parses a world-info difficulty rowName (e.g. "Theater_Hard_Zone2") into its
+ * difficulty family and 1-based zone index. Returns null when the rowName is
+ * absent, "None", or does not match the expected shape.
+ *
+ * Group (4-player) missions use their own rows ("Theater_Hard_Group_Zone2").
+ * Raw world-info data plus live alert listings confirm group rows carry the
+ * same Power Level per tier as the base rows, so the "_Group_" marker is
+ * normalized away before lookup.
+ */
+export function parseDifficultyRowName(rowName) {
+  if (typeof rowName !== "string" || rowName === "" || rowName === "None") {
+    return null;
+  }
+
+  const normalizedRowName = rowName.replace("_Group_Zone", "_Zone");
+  const match = ROW_NAME_PATTERN.exec(normalizedRowName);
+
+  if (!match) {
+    return null;
+  }
+
+  const family = match[1];
+  const zoneIndex = Number(match[2]);
+
+  if (!Number.isInteger(zoneIndex) || zoneIndex < 1) {
+    return null;
+  }
+
+  return { family, zoneIndex };
+}
+
+/**
+ * Resolves the displayed Power Level for a mission from its difficulty row.
+ *
+ * Strategy:
+ *   1. Parse the rowName into (difficulty family, zone index).
+ *   2. Look the family up in DIFFICULTY_FAMILIES (values sourced from Epic's
+ *      GameDifficultyGrowthBounds DataTable — see the table comment above).
+ *   3. Return the Power Level for that zone index, or null when anything is
+ *      unknown/out of range. Never guesses or falls back to a wrong number.
+ */
 export function getPowerLevel(missionDifficultyInfo) {
   const rowName =
     typeof missionDifficultyInfo === "string"
       ? missionDifficultyInfo
       : missionDifficultyInfo?.rowName;
 
-  if (!rowName || rowName === "None") {
+  const parsed = parseDifficultyRowName(rowName);
+
+  if (!parsed) {
+    if (rowName && rowName !== "None") {
+      console.error(
+        `POWER_LEVEL_RESOLUTION_FAILED { reason: "unrecognized_row_name", rowName: ${JSON.stringify(rowName)} }`
+      );
+    }
     return null;
   }
 
-  const power = DIFFICULTY_POWER_MAP[rowName];
-  return typeof power === "number" ? power : null;
+  const { family, zoneIndex } = parsed;
+  const familyData = DIFFICULTY_FAMILIES.find((entry) => entry.family === family);
+
+  if (!familyData) {
+    console.error(
+      `POWER_LEVEL_RESOLUTION_FAILED { reason: "unknown_difficulty_family", rowName: ${JSON.stringify(rowName)} }`
+    );
+    return null;
+  }
+
+  const power = familyData.powerLevels[zoneIndex - 1];
+
+  if (typeof power !== "number") {
+    console.error(
+      `POWER_LEVEL_RESOLUTION_FAILED { reason: "zone_index_out_of_range", rowName: ${JSON.stringify(rowName)}, maxZone: ${familyData.powerLevels.length} }`
+    );
+    return null;
+  }
+
+  return power;
+}
+
+/**
+ * Sanity check: verifies that a resolved Power Level is plausible for the
+ * theater (zone) Epic reported the mission in. Ventures/Phoenix rows have no
+ * single expected theater and are always accepted. Returns true when the
+ * mission's Power Level is valid for its theater, and false when it likely
+ * comes from another theater or an unknown mapping — callers should log this
+ * rather than trust the value blindly.
+ */
+export function isPowerLevelValidForTheater(powerLevel, theaterName) {
+  if (typeof powerLevel !== "number" || !theaterName) {
+    return false;
+  }
+
+  const band = POWER_LEVEL_BANDS[theaterName];
+
+  if (!band) {
+    // Unknown theater: cannot validate either way.
+    return true;
+  }
+
+  return powerLevel >= band.min && powerLevel <= band.max;
 }
 
 export function extractZoneThemeIdentifier(zoneTheme) {

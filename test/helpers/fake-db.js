@@ -41,6 +41,7 @@ export function createFakeDb(tables = {}) {
     channels: tables.channels || [],
     admin_sessions: tables.admin_sessions || [],
     broadcast_history: tables.broadcast_history || [],
+    mission_images: tables.mission_images || [],
   };
   const stateJsonWrites = [];
   const sqlLog = [];
@@ -66,7 +67,10 @@ export function createFakeDb(tables = {}) {
           return { ...current };
         }
 
-        if (/count\(\*\)/i.test(s)) return { c: filtered.length };
+        if (/count\(\*\)/i.test(s)) {
+          const alias = s.match(/count\(\*\)\s+as\s+(\w+)/i)?.[1] || "c";
+          return { [alias]: filtered.length };
+        }
 
         // Alias mapping for projections like "telegram_id AS id, first_name AS label".
         const aliases = [...s.matchAll(/([a-z_]+)\s+AS\s+([a-z_]+)/gi)].map(([, src, dst]) => [src, dst]);
@@ -120,6 +124,14 @@ export function createFakeDb(tables = {}) {
       if (s.includes("admin_sessions")) {
         state.admin_sessions = state.admin_sessions.filter((r) => r.chat_id !== args?.[0]);
         return { meta: { changes: 1 } };
+      }
+      if (s.includes("mission_images")) {
+        const before = state.mission_images.length;
+        const whereMatch = s.match(/where\s+([\s\S]*)/i);
+        state.mission_images = whereMatch
+          ? state.mission_images.filter((r) => !rowMatches(whereMatch[1].replace(/\s+order by.*$/i, ""), r, args || []))
+          : [];
+        return { meta: { changes: before - state.mission_images.length } };
       }
       return { meta: { changes: 0 } };
     }

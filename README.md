@@ -260,6 +260,7 @@ It currently provides:
 * 🔔 **Active Reminders** — inspect users, groups, and channels with reminders enabled.
 * 📨 **Broadcast Messages** — select recipients by type and filter them by reminder status or recent activity.
 * 📄 **PDF Reports** — generate structured administrative reports with summary cards, activity tables, pagination, and embedded report fonts.
+* 🗄️ **Cache Settings** — inspect the number of cached mission images (`SELECT COUNT(*) FROM mission_images`) and delete the entire cache after an explicit confirmation step.
 * 🛡️ **Server-side authorization** — administrative callbacks are verified independently of the Telegram UI.
 
 Broadcast delivery is designed for Cloudflare Workers' execution model: the webhook acknowledges the interaction immediately while the actual recipient delivery continues through `ctx.waitUntil()`. Delivery is isolated per recipient and failures do not stop the remaining recipients.
@@ -695,7 +696,7 @@ The current deployment configuration includes:
 
 The scheduled trigger is configured through Cloudflare Cron and invokes the Worker's scheduled handler.
 
-The daily reminder runs at **00:05 UTC every day**.
+The daily reminder runs at **00:00:30 UTC every day**. Cloudflare cron triggers only support minute granularity, so the trigger fires at 00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 30-second delay before mission processing starts.
 
 ---
 
@@ -1237,12 +1238,12 @@ The changelog follows a structure inspired by **Keep a Changelog**, with version
 The current release baseline is:
 
 ```text
-1.1.1
+1.2.0
 ```
 
 The project follows Semantic Versioning for releases where practical.
 
-Version 1.1.1 includes the production Admin Panel, D1 activity tracking and migrations, recipient filtering and broadcast delivery, PDF administrative reports, regression tests, and related deployment hardening.
+Version 1.2.0 includes the corrected Save the World mission Power Level resolution (current Epic difficulty tiers, Canny Valley correction, and group-mission difficulty rows), the Admin Panel Cache Settings for mission image cache inspection and confirmed deletion, the 00:00:30 UTC daily reminder schedule, and related regression tests.
 
 ---
 

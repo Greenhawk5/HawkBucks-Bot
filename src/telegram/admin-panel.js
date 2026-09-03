@@ -27,6 +27,10 @@ import {
 } from "../../database/stats.js";
 import { buildPdfDocument } from "../services/pdf.js";
 import {
+  getMissionImageCacheCount,
+  clearMissionImageCache,
+} from "../../database/mission-images.js";
+import {
   adminPanelText,
   adminPanelKeyboard,
   adminUsagePeriodsKeyboard,
@@ -35,6 +39,12 @@ import {
   adminRemindersText,
   adminRemindersKeyboard,
   adminReminderListKeyboard,
+  adminCacheMenuText,
+  adminCacheKeyboard,
+  adminCacheCountText,
+  ADMIN_CACHE_CONFIRM_TEXT,
+  adminCacheConfirmKeyboard,
+  adminCacheDeletedText,
   ADMIN_ACCESS_DENIED_MESSAGE,
   ADMIN_PANEL_CLOSED_MESSAGE,
   ADMIN_EMPTY_STATE_PREFIX,
@@ -336,6 +346,50 @@ async function exportRemindersPdf(env, db, chatId, queryId) {
   return true;
 }
 
+// ---------- Cache settings ----------
+
+async function showCacheMenu(env, db, chatId, messageId, queryId) {
+  await editMessageText(env, chatId, messageId, adminCacheMenuText(), {
+    reply_markup: adminCacheKeyboard(),
+  });
+  await answerCallbackQuery(env, queryId);
+  return true;
+}
+
+async function showCacheCount(env, db, chatId, messageId, queryId) {
+  const count = await getMissionImageCacheCount(db);
+  if (count === null) {
+    await answerCallbackQuery(env, queryId, { text: "Cache count unavailable." });
+    return true;
+  }
+  await editMessageText(env, chatId, messageId, adminCacheCountText(count), {
+    reply_markup: adminCacheKeyboard(),
+  });
+  await answerCallbackQuery(env, queryId);
+  return true;
+}
+
+async function showCacheDeleteConfirmation(env, db, chatId, messageId, queryId) {
+  await editMessageText(env, chatId, messageId, ADMIN_CACHE_CONFIRM_TEXT, {
+    reply_markup: adminCacheConfirmKeyboard(),
+  });
+  await answerCallbackQuery(env, queryId);
+  return true;
+}
+
+async function confirmCacheDelete(env, db, chatId, messageId, queryId) {
+  const deleted = await clearMissionImageCache(db);
+  if (deleted === null) {
+    await answerCallbackQuery(env, queryId, { text: "Cache clearing failed." });
+    return true;
+  }
+  await editMessageText(env, chatId, messageId, adminCacheDeletedText(deleted), {
+    reply_markup: adminCacheKeyboard(),
+  });
+  await answerCallbackQuery(env, queryId);
+  return true;
+}
+
 // ---------- Callback router ----------
 
 export async function handleAdminCallback(env, db, callbackQuery, ctx) {
@@ -411,6 +465,27 @@ export async function handleAdminCallback(env, db, callbackQuery, ctx) {
 
     if (parts[1] === "bc") {
       return await handleBroadcastCallback(env, db, { chatId, messageId, queryId, parts, from, callbackQuery, ctx }, ctx);
+    }
+
+    if (parts[1] === "cache" && parts.length === 2) {
+      return await showCacheMenu(env, db, chatId, messageId, queryId);
+    }
+
+    if (parts[1] === "cache" && parts[2] === "count") {
+      return await showCacheCount(env, db, chatId, messageId, queryId);
+    }
+
+    if (parts[1] === "cache" && parts[2] === "delete" && parts[3] === "confirm") {
+      return await confirmCacheDelete(env, db, chatId, messageId, queryId);
+    }
+
+    if (parts[1] === "cache" && parts[2] === "delete" && parts[3] === "cancel") {
+      return await showCacheMenu(env, db, chatId, messageId, queryId);
+    }
+
+    if (parts[1] === "cache" && parts[2] === "delete") {
+      // Confirmation screen — nothing is deleted until explicitly confirmed.
+      return await showCacheDeleteConfirmation(env, db, chatId, messageId, queryId);
     }
 
     // Unknown admin action: deny without leaking information.

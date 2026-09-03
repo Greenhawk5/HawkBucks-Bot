@@ -45,3 +45,41 @@ export async function releaseMissionImageReservation(db, date) {
   if (!db) return;
   await db.prepare("DELETE FROM mission_images WHERE date = ? AND status = 'generating'").bind(date).run();
 }
+
+/**
+ * Admin Panel: number of rows currently in the mission image cache.
+ * Equivalent to the operational CLI command
+ *   SELECT COUNT(*) AS image_count FROM mission_images;
+ * Returns null when the database is unavailable or the query fails.
+ */
+export async function getMissionImageCacheCount(db) {
+  if (!db) return null;
+  try {
+    const row = await db
+      .prepare("SELECT COUNT(*) AS image_count FROM mission_images")
+      .first();
+    const value = Number(row?.image_count);
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  } catch (error) {
+    console.error("IMAGE_CACHE_COUNT_FAILED", { error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Admin Panel: permanently deletes every cached mission image.
+ * Returns the actual number of deleted rows (D1 result metadata), or null
+ * when the database is unavailable or the delete fails.
+ */
+export async function clearMissionImageCache(db) {
+  if (!db) return null;
+  try {
+    const result = await db.prepare("DELETE FROM mission_images").run();
+    const deleted = Number(result?.meta?.changes ?? 0);
+    console.log("IMAGE_CACHE_CLEARED", { count: deleted });
+    return Number.isSafeInteger(deleted) && deleted >= 0 ? deleted : 0;
+  } catch (error) {
+    console.error("IMAGE_CACHE_CLEAR_FAILED", { error: error.message });
+    return null;
+  }
+}

@@ -5,10 +5,29 @@ All notable changes to HawkBucks Bot are documented in this file.
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows Semantic Versioning where practical.
 
-## [Unreleased]
+## [1.2.0] - 2026-09-03
 
 ### Added
-- Future improvements and maintenance changes will be documented here.
+- Admin Panel "🗄️ Cache Settings" section with "📊 Today's Cached Images" (runs `SELECT COUNT(*) AS image_count FROM mission_images` through the D1 binding) and "🗑️ Delete All Cached Images" (runs `DELETE FROM mission_images` only after an explicit confirmation step, reporting the actual deleted-row count).
+- Theater-band validation for mission Power Levels: resolved Power Levels are checked against the valid range of the mission's theater and mismatches are logged instead of being emitted silently.
+- Support for group (4-player) mission difficulty rows (`Theater_*_Group_ZoneN`), which share the base rows' Power Levels per tier (verified against raw Epic world-info data and live alert listings).
+- Regression tests for Power Level resolution (including the Canny Valley 46→52 correction, group rows, out-of-range/unknown difficulty rows, and per-mission association).
+- Regression tests for the Cache Settings flow (count display, zero counts, delete confirmation, D1 error handling, admin-only and private-chat authorization).
+- Regression tests for the daily reminder schedule.
+- Offline diagnostic tool `scripts/diagnose-power-levels.js` for extracting theater/mission/difficulty-row evidence from a raw Epic world-info payload.
+
+### Changed
+- Daily mission/reminder processing now starts at **00:00:30 UTC** instead of 00:05 UTC. The cron trigger fires at 00:00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 30-second delay inside `ctx.waitUntil`, because Cloudflare cron triggers only support minute granularity.
+- Mission Power Level resolution now parses `MissionDifficultyInfo.rowName` into (difficulty family, zone index) and resolves it against the current Epic `GameDifficultyGrowthBounds` tier values instead of the stale flat mapping.
+- Updated the Canny Valley difficulty tiers to the current live values (46, 52, 58, 64, 70 — the legacy 40–70 six-tier layout no longer exists in live data).
+- Missions now carry their raw `difficultyRow` for provenance/debugging.
+- The fake D1 test helper now models the `mission_images` table (COUNT with alias preservation and DELETE change counts).
+
+### Fixed
+- Corrected V-Buck mission Power Level resolution showing 46 instead of 52 for Canny Valley missions on `Theater_Hard_Zone2` (root cause: stale hardcoded difficulty mapping).
+
+### Documentation
+- Documented Cache Settings in the Admin Panel feature list.
 
 ## [1.1.1] - 2026-08-30
 

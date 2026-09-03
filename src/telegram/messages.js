@@ -180,6 +180,7 @@ export function adminPanelKeyboard() {
       [{ text: "📊 Usage Statistics", callback_data: "admin:usage" }],
       [{ text: "🔔 Active Reminders", callback_data: "admin:rem" }],
       [{ text: "📨 Broadcast Message", callback_data: "admin:bc" }],
+      [{ text: "🗄️ Cache Settings", callback_data: "admin:cache" }],
       [{ text: "🔙 Back", callback_data: "admin:root:back" }],
     ],
   };
@@ -255,6 +256,64 @@ export function adminRemindersText(counts) {
     `${text("📢 Channels:")} ${text(counts.channels)}`,
     "",
     text("Select a category to view recipients."),
+  ].join("\n");
+}
+
+// ---------- Admin Panel: Cache Settings ----------
+
+export function adminCacheMenuText() {
+  return [
+    bold("🗄️ Cache Settings"),
+    "",
+    text("Manage the cached mission images used for reminder delivery."),
+  ].join("\n");
+}
+
+export function adminCacheKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "📊 Today's Cached Images", callback_data: "admin:cache:count" }],
+      [{ text: "🗑️ Delete All Cached Images", callback_data: "admin:cache:delete" }],
+      [{ text: "🔙 Back", callback_data: "admin:root" }],
+    ],
+  };
+}
+
+export function adminCacheCountText(count) {
+  return [
+    bold("🗄️ Cache Settings"),
+    "",
+    bold("📊 Cached mission images"),
+    "",
+    `${text("Today:")} ${text(String(count))} ${text(count === 1 ? "image" : "images")}`,
+    "",
+    text("This is the current number of rows in"),
+    code("mission_images"),
+  ].join("\n");
+}
+
+export const ADMIN_CACHE_CONFIRM_TEXT = [
+  bold("⚠️ Delete Mission Image Cache?"),
+  "",
+  text("This will permanently delete all cached mission images from D1."),
+  "",
+  text("This action cannot be undone."),
+].join("\n");
+
+export function adminCacheConfirmKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "❌ Yes, Delete Everything", callback_data: "admin:cache:delete:confirm" }],
+      [{ text: "🔙 Cancel", callback_data: "admin:cache" }],
+    ],
+  };
+}
+
+export function adminCacheDeletedText(count) {
+  return [
+    bold("✅ Cache cleared successfully."),
+    "",
+    `${text("Deleted:")} ${text(String(count))} ${text(count === 1 ? "cached image" : "cached images")}`,
   ].join("\n");
 }
 

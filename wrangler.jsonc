@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "hawkbucks-cloudflare",
+	"name": "hawkbucks-bot",
 	"main": "src/index.js",
 	"compatibility_date": "2026-07-25",
 
@@ -15,7 +15,7 @@
 	],
 
 	"triggers": {
-		"crons": ["5 0 * * *"]
+		"crons": ["0 0 * * *"]
 	},
 
 	"d1_databases": [
