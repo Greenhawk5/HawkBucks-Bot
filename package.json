@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/epic-client.test.js test/epic-parser.test.js test/icon-map.test.js test/power-level.test.js test/reminder-schedule.test.js test/cache-settings.test.js test/missions-service.test.js test/formatter.test.js test/admin-core.test.js test/admin-data.test.js test/admin-broadcast.test.js test/migration.test.js test/callback-dispatch.test.js test/image-rendering.test.js",
+    "test": "node --test test/epic-client.test.js test/epic-parser.test.js test/icon-map.test.js test/power-level.test.js test/reminder-schedule.test.js test/cache-settings.test.js test/missions-service.test.js test/formatter.test.js test/admin-core.test.js test/admin-data.test.js test/admin-broadcast.test.js test/migration.test.js test/callback-dispatch.test.js test/recipients.test.js test/image-rendering.test.js",
     "deploy": "node scripts/embed-assets.js && wrangler deploy",
     "deploy:d1": "node scripts/deploy-d1-schema.js",
     "deploy:full": "node scripts/embed-assets.js && node scripts/deploy-d1-schema.js && wrangler deploy",

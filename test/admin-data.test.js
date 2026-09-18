@@ -59,11 +59,12 @@ test("active reminder user list exposes persisted metadata only", async () => {
 
 test("broadcast recipient filters separate reminder status and activity", async () => {
   const db = makeDb();
+  const now = new Date("2026-08-29T12:00:00Z"); // fixed reference time for the activity window
   assert.equal(await countBroadcastRecipients(db, "users", "all"), 4);
   assert.equal(await countBroadcastRecipients(db, "users", "on"), 3);
   assert.equal(await countBroadcastRecipients(db, "users", "off"), 1);
-  assert.equal(await countBroadcastRecipients(db, "users", "active"), 2); // alice + carol (7-day window)
-  assert.equal(await countBroadcastRecipients(db, "users", "inactive"), 2); // bob + dave (null last_seen)
+  assert.equal(await countBroadcastRecipients(db, "users", "active", { now }), 2); // alice + carol (7-day window)
+  assert.equal(await countBroadcastRecipients(db, "users", "inactive", { now }), 2); // bob + dave (null last_seen)
   assert.equal(await countBroadcastRecipients(db, "groups", "on"), 1);
 });
 

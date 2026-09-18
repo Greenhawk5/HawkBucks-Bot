@@ -13,6 +13,22 @@
 
 const ACTIVE_WINDOW_DAYS = 7;
 
+// D1 CURRENT_TIMESTAMP / datetime() values are stored as
+// 'YYYY-MM-DD HH:MM:SS' (UTC). Activity cutoffs are therefore formatted the
+// same way so plain string comparisons behave identically in D1 and in the
+// fake test database.
+function toD1Timestamp(date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+// Cutoff for the "recently active" recipient filters. Computed on the Worker
+// side (instead of datetime('now') inside SQL) so the reference time is
+// injectable: production defaults to the actual current time, while tests
+// pass a fixed `now` for deterministic results.
+export function activityCutoff(now = new Date(), windowDays = ACTIVE_WINDOW_DAYS) {
+  return toD1Timestamp(new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000));
+}
+
 const RECIPIENT_TYPES = {
   users: {
     table: "users",
@@ -46,32 +62,42 @@ export function recipientType(type) {
   return RECIPIENT_TYPES[type] || null;
 }
 
-function filterClause(filter) {
+function filterClause(filter, cutoff) {
   switch (filter) {
     case "on": return "reminder_enabled = 1";
     case "off": return "reminder_enabled = 0";
-    case "active": return `last_seen >= datetime('now', '-${ACTIVE_WINDOW_DAYS} days')`;
-    case "inactive": return `(last_seen IS NULL OR last_seen < datetime('now', '-${ACTIVE_WINDOW_DAYS} days'))`;
+    case "active": return "last_seen >= ?";
+    case "inactive": return "(last_seen IS NULL OR last_seen < ?)";
     case "all":
     default: return "1=1";
   }
 }
 
-export async function listBroadcastRecipients(db, type, filter, { offset = 0, limit = 10 } = {}) {
+export async function listBroadcastRecipients(db, type, filter, {
+  offset = 0,
+  limit = 10,
+  now = new Date(),
+  activityWindowDays = ACTIVE_WINDOW_DAYS,
+} = {}) {
   const cfg = recipientType(type);
   if (!cfg) return [];
-  const where = filterClause(filter);
+  const cutoff = activityCutoff(now, activityWindowDays);
+  const where = filterClause(filter, cutoff);
   const rows = await db.prepare(
     `SELECT ${cfg.columns} FROM ${cfg.table}
      WHERE ${where} ORDER BY ${cfg.idColumn} LIMIT ? OFFSET ?`
-  ).bind(limit, offset).all();
+  ).bind(cutoff, limit, offset).all();
   return (rows.results || []).map(cfg.normalize);
 }
 
-export async function countBroadcastRecipients(db, type, filter) {
+export async function countBroadcastRecipients(db, type, filter, {
+  now = new Date(),
+  activityWindowDays = ACTIVE_WINDOW_DAYS,
+} = {}) {
   const cfg = recipientType(type);
   if (!cfg) return 0;
-  const where = filterClause(filter);
-  const row = await db.prepare(`SELECT COUNT(*) AS c FROM ${cfg.table} WHERE ${where}`).first();
+  const cutoff = activityCutoff(now, activityWindowDays);
+  const where = filterClause(filter, cutoff);
+  const row = await db.prepare(`SELECT COUNT(*) AS c FROM ${cfg.table} WHERE ${where}`).bind(cutoff).first();
   return Number(row?.c || 0);
 }

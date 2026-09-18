@@ -5,13 +5,11 @@
 
 // Fake D1. Handles the SQL shapes used by the admin modules:
 // - alias mapping ("telegram_id AS id")
-// - parameterized and datetime('now', ...) date filters
+// - parameterized date filters (cutoffs are computed by the application and
+//   bound as 'YYYY-MM-DD HH:MM:SS' strings, so plain string comparison works)
 // - LIMIT ? OFFSET ? pagination
-const ACTIVE_WINDOW_DAYS = 7;
-
-function d1Timestamp(date) {
-  return date.toISOString().slice(0, 19).replace("T", " ");
-}
+// NOTE: filter parameters are always bound before LIMIT/OFFSET parameters
+// (see database/recipients.js), so LIMIT/OFFSET are read from the last args.
 
 function rowMatches(where, row, args) {
   if (!where || /^1=1/i.test(where.trim())) return true;
@@ -19,15 +17,7 @@ function rowMatches(where, row, args) {
   if (/reminder_enabled\s*=\s*1/.test(where)) return Number(row.reminder_enabled) === 1;
   if (/reminder_enabled\s*=\s*0/.test(where)) return Number(row.reminder_enabled) === 0;
   if (/last_seen\s*>=\s*\?/.test(where)) return Boolean(row.last_seen) && row.last_seen >= args[0];
-  if (/last_seen\s*>=\s*datetime\('now',\s*'-7 days'\)/.test(where)) {
-    if (!row.last_seen) return false;
-    return row.last_seen >= d1Timestamp(new Date(Date.now() - ACTIVE_WINDOW_DAYS * 86400000));
-  }
-  if (/last_seen\s*<\s*datetime\('now',\s*'-7 days'\)/.test(where)) {
-    if (!row.last_seen) return true;
-    return row.last_seen < d1Timestamp(new Date(Date.now() - ACTIVE_WINDOW_DAYS * 86400000));
-  }
-  if (/last_seen\s*>=\s*\?/.test(where)) return row.last_seen >= args[0];
+  if (/last_seen\s*<\s*\?/.test(where)) return !row.last_seen || row.last_seen < args[0];
   const inMatch = where.match(/([a-z_]+)\s+IN\s*\(/i);
   if (inMatch) return args.map(String).includes(String(row[inMatch[1]]));
   return true;

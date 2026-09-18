@@ -35,6 +35,8 @@ async function runList(db, type, filter) {
   return sqls;
 }
 
+const FIXTURE_NOW = new Date("2026-08-29T12:00:00Z");
+
 // ---------- Filter semantics ----------
 
 test("users filters: all / on / off / active / inactive", async () => {
@@ -42,11 +44,48 @@ test("users filters: all / on / off / active / inactive", async () => {
   assert.equal(await countBroadcastRecipients(db, "users", "all"), 4);
   assert.equal(await countBroadcastRecipients(db, "users", "on"), 3);
   assert.equal(await countBroadcastRecipients(db, "users", "off"), 1);
-  assert.equal(await countBroadcastRecipients(db, "users", "active"), 2);
-  assert.equal(await countBroadcastRecipients(db, "users", "inactive"), 2);
+  assert.equal(await countBroadcastRecipients(db, "users", "active", { now: FIXTURE_NOW }), 2);
+  assert.equal(await countBroadcastRecipients(db, "users", "inactive", { now: FIXTURE_NOW }), 2);
 
   const off = await listBroadcastRecipients(db, "users", "off", { offset: 0, limit: 50 });
   assert.deepEqual(off.map((r) => r.id), ["2"]);
+});
+
+test("REGRESSION: activity window is anchored to the injected reference time, not the real clock", async () => {
+  const db = makeDb();
+
+  // With the fixture reference time (2026-08-29T12:00:00Z), the 7-day window
+  // covers alice and carol.
+  const active = await listBroadcastRecipients(db, "users", "active", {
+    now: FIXTURE_NOW,
+    offset: 0,
+    limit: 50,
+  });
+  assert.deepEqual(active.map((r) => r.id).sort(), ["1", "3"]);
+
+  // Moving the reference time forward pushes everyone out of the window;
+  // the cutoff must follow `now`, not Date.now(), or fixtures date-rot.
+  const later = new Date("2026-12-01T00:00:00Z");
+  assert.equal(await countBroadcastRecipients(db, "users", "active", { now: later }), 0);
+  assert.equal(await countBroadcastRecipients(db, "users", "inactive", { now: later }), 4);
+
+  // The window length is configurable as well.
+  assert.equal(
+    await countBroadcastRecipients(db, "users", "active", { now: later, activityWindowDays: 365 }),
+    3 // dave has no last_seen and is never "active"
+  );
+});
+
+test("REGRESSION: inactive filter with a bound cutoff excludes recently active recipients", async () => {
+  // The inactive clause is (last_seen IS NULL OR last_seen < ?); the fake DB
+  // must honor the bound cutoff instead of matching every row.
+  const db = makeDb();
+  const inactive = await listBroadcastRecipients(db, "users", "inactive", {
+    now: FIXTURE_NOW,
+    offset: 0,
+    limit: 50,
+  });
+  assert.deepEqual(inactive.map((r) => r.id).sort(), ["2", "4"]);
 });
 
 test("groups filters: Reminder OFF returns disabled groups (production bug regression)", async () => {
@@ -72,7 +111,7 @@ test("groups filters: all / on / active counts and listing", async () => {
   assert.equal(await countBroadcastRecipients(db, "groups", "all"), 3);
   assert.equal(await countBroadcastRecipients(db, "groups", "on"), 2);
   assert.equal(await countBroadcastRecipients(db, "groups", "off"), 1);
-  assert.ok(Array.isArray(await listBroadcastRecipients(db, "groups", "active", { offset: 0, limit: 50 })));
+  assert.ok(Array.isArray(await listBroadcastRecipients(db, "groups", "active", { now: FIXTURE_NOW, offset: 0, limit: 50 })));
 });
 
 // ---------- SQL regression (the exact production bug) ----------
