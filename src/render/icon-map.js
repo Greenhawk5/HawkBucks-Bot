@@ -23,7 +23,39 @@ function hasFourPlayerVariant(...values) {
 function getAtlasVariant(type, category) {
   const normalizedType = normalizeMissionType(type).replace(/_4_player$/, "");
   const normalizedCategory = normalizeMissionType(category).replace(/_4_player$/, "");
-  return ATLAS_BY_CATEGORY[normalizedType] || ATLAS_BY_CATEGORY[normalizedCategory] || null;
+
+  const direct =
+    ATLAS_BY_CATEGORY[normalizedType] || ATLAS_BY_CATEGORY[normalizedCategory];
+
+  if (direct) return direct;
+
+  // Epic's localized storm-mission titles ("Fight Category 4 Storm") and
+  // other sources ("Category 4 Fight The Storm", dedup key
+  // "fight the storm category 4") normalize to different shapes. All of
+  // them carry the same Atlas count, so map the storm category number to
+  // the canonical ATLAS_BY_CATEGORY key generically.
+  const stormCategory = getStormCategory(normalizedType, normalizedCategory);
+
+  return stormCategory
+    ? ATLAS_BY_CATEGORY[`category_${stormCategory}_fight_the_storm`]
+    : null;
+}
+
+const STORM_CATEGORY_PATTERN =
+  /^(?:fight_category_(\d+)_storm|category_(\d+)_fight_the_storm|fight_the_storm_category_(\d+))$/;
+
+function getStormCategory(...values) {
+  for (const value of values) {
+    const match = STORM_CATEGORY_PATTERN.exec(String(value));
+
+    if (match) {
+      const category = match.slice(1).find(Boolean);
+
+      if (category) return Number(category);
+    }
+  }
+
+  return null;
 }
 
 function getExactAssetName(type, category = "") {

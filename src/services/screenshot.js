@@ -26,7 +26,8 @@ export async function generateScreenshot(html, env, layout) {
 
         viewport_width: layout.width,
         viewport_height: layout.canvasHeight,
-        device_scale_factor: 1,
+        device_scale_factor: 2,
+        image_quality: 100,
 
         wait_until: [
           "load"

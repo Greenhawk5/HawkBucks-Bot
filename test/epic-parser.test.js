@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseWorldInfo, totalVbucks } from "../src/epic/parser.js";
+import { getZoneName } from "../src/epic/mappings.js";
 import {
   alertWithoutMissionFixture,
   nonVbucksAlertFixture,
@@ -25,6 +26,107 @@ test("parser extracts V-Buck alerts with zone, power, reward, type and category"
   assert.equal(twine.reward.amount, 50);
   assert.equal(twine.mission.type, "Fight the Storm");
   assert.equal(twine.mission.category, "Scurvy Shoals (Tropical)");
+});
+
+test("parser resolves ZT_TheForest zone theme to Forest", () => {
+  // Regression: "/ZoneThemes/ZT_TheForest/BP_ZT_TheForest..." is a legitimate
+  // zone theme that must resolve to "Forest", not "Unknown Zone".
+  const worldData = {
+    theaters: [
+      {
+        uniqueId: "Twine Peaks",
+        displayName: { en: "Twine Peaks" },
+        tiles: [
+          {
+            tileType: "AlwaysActive",
+            zoneTheme:
+              "/STW_Zones/World/ZoneThemes/ZT_TheForest/BP_ZT_TheForest.BP_ZT_TheForest_C",
+          },
+        ],
+      },
+    ],
+    missions: [],
+    missionAlerts: [
+      {
+        theaterId: "Twine Peaks",
+        availableMissionAlerts: [
+          {
+            tileIndex: 0,
+            missionAlertRewards: {
+              items: [
+                { itemType: "AccountResource:currency_mtxswap", quantity: 50 },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  const missions = parseWorldInfo(worldData);
+
+  assert.equal(missions.length, 1);
+  assert.equal(missions[0].mission.category, "Forest");
+  assert.equal(getZoneName(
+    "/STW_Zones/World/ZoneThemes/ZT_TheForest/BP_ZT_TheForest.BP_ZT_TheForest_C"
+  ), "Forest");
+});
+
+test("parser resolves campaign-prefixed zone themes (BP_ZT_AD_*) to their base zone", () => {
+  // Regression: tiles using campaign zone-theme assets such as
+  // "/ZoneThemes/AD/BP_ZT_AD_Lakeside..." previously resolved to
+  // "Unknown Zone" because the asset name carries no bare "ZT_" token.
+  const worldData = {
+    theaters: [
+      {
+        uniqueId: "Twine Peaks",
+        displayName: { en: "Twine Peaks" },
+        tiles: [
+          {
+            tileType: "AlwaysActive",
+            zoneTheme:
+              "/STW_Zones/World/ZoneThemes/AD/BP_ZT_AD_Lakeside.BP_ZT_AD_Lakeside_C",
+          },
+        ],
+      },
+    ],
+    missions: [
+      {
+        theaterId: "Twine Peaks",
+        availableMissions: [
+          {
+            tileIndex: 0,
+            missionGenerator: "MissionGenerator_RtS_Dynamic",
+            missionDifficultyInfo: { dataTable: "x", rowName: "Theater_Nightmare_Zone5" },
+          },
+        ],
+      },
+    ],
+    missionAlerts: [
+      {
+        theaterId: "Twine Peaks",
+        availableMissionAlerts: [
+          {
+            tileIndex: 0,
+            missionAlertRewards: {
+              items: [
+                { itemType: "AccountResource:currency_mtxswap", quantity: 50 },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  const missions = parseWorldInfo(worldData);
+
+  assert.equal(missions.length, 1);
+  assert.equal(missions[0].zone, "Twine Peaks");
+  assert.equal(missions[0].powerLevel, 100);
+  assert.equal(missions[0].reward.amount, 50);
+  assert.equal(missions[0].mission.type, "Repair the Shelter");
+  assert.equal(missions[0].mission.category, "Lakeside");
 });
 
 test("parser ignores alerts without a V-Bucks reward", () => {

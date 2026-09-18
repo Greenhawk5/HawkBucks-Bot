@@ -111,6 +111,7 @@ export const ZONE_MAP = {
   ZT_FinalFrontier: "Final Frontier",
   ZT_TheGrasslands: "Grasslands",
   ZT_Grasslands: "Grasslands",
+  ZT_TheForest: "Forest",
   ZT_Forest: "Forest",
   ZT_HauntedForest: "Haunted Forest",
   ZT_Lakeside: "Lakeside",
@@ -129,6 +130,36 @@ export const ZONE_THEME_ALIASES = {
   BP_ZT_AD_TheIndustrialPark: "ZT_IndustrialPark",
   BP_ZT_IndustrialPark: "ZT_IndustrialPark",
 };
+
+// Some zone-theme assets embed a campaign prefix between the "ZT_" marker and
+// the theme name (for example "BP_ZT_AD_Lakeside", "BP_ZT_AD2_TheGrasslands").
+// These appear whenever a tile uses a campaign variant of a standard zone.
+// Stripping the "BP_" class prefix and the campaign segment recovers the base
+// "ZT_..." identifier that ZONE_MAP knows about, so new campaign variants of
+// existing zones resolve without further mapping changes.
+const ZONE_THEME_CAMPAIGN_PREFIXES = /^ZT_(?:AD2|AD|TRV)_/;
+
+/**
+ * Yields progressively-normalized identifiers for a zone-theme asset name.
+ * Example: "BP_ZT_AD_Lakeside" → ["ZT_AD_Lakeside", "ZT_Lakeside"].
+ */
+function zoneThemeCandidates(assetName) {
+  const base = assetName.startsWith("BP_")
+    ? assetName.slice("BP_".length)
+    : assetName;
+
+  const candidates = [base];
+
+  if (base.startsWith("ZT_")) {
+    const stripped = base.replace(ZONE_THEME_CAMPAIGN_PREFIXES, "ZT_");
+
+    if (stripped !== base) {
+      candidates.push(stripped);
+    }
+  }
+
+  return candidates;
+}
 
 export const MISSION_MAP = {
   _1Gate_: "029003B949368614A8DABBA356C1C2BB",
@@ -294,12 +325,23 @@ export function extractZoneThemeIdentifier(zoneTheme) {
   for (const part of themeParts) {
     const assetName = part.split(".")[0];
 
-    if (ZONE_THEME_ALIASES[assetName]) {
-      return ZONE_THEME_ALIASES[assetName];
-    }
+    for (const candidate of zoneThemeCandidates(assetName)) {
+      const identifier = ZONE_THEME_ALIASES[candidate] || candidate;
 
-    if (assetName.startsWith("ZT_")) {
-      return assetName;
+      if (ZONE_MAP[identifier]) {
+        return identifier;
+      }
+    }
+  }
+
+  // No direct ZONE_MAP hit — fall back to the first recognizable "ZT_..."
+  // identifier so callers still surface an informative
+  // "Unknown Zone (ZT_...)" instead of a bare "Unknown Zone".
+  for (const part of themeParts) {
+    for (const candidate of zoneThemeCandidates(part.split(".")[0])) {
+      if (candidate.startsWith("ZT_")) {
+        return candidate;
+      }
     }
   }
 

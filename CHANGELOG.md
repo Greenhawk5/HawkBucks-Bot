@@ -5,6 +5,26 @@ All notable changes to HawkBucks Bot are documented in this file.
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows Semantic Versioning where practical.
 
+## [1.2.5] - 2026-09-18
+
+### Fixed
+- Corrected zone-name resolution for Epic zone themes that previously fell through to "Unknown Zone": `ZT_TheForest` now resolves to Forest, and campaign-prefixed zone-theme assets such as `BP_ZT_AD_Lakeside` or `BP_ZT_AD2_TheGrasslands` are normalized to their base zone by stripping the `AD`, `AD2`, and `TRV` campaign prefixes. When no mapping exists, the fallback now surfaces a recognizable identifier ("Unknown Zone (ZT_...)") instead of a bare "Unknown Zone".
+- Storm-mission cards now show the correct Atlas-count icon for localized storm titles: the storm category number is extracted generically from "Fight Category N Storm", "Category N Fight The Storm", and "Fight the Storm Category N" variants instead of falling back to the single-Atlas icon.
+- The zone ribbon on the mission image now displays the actual number of missions belonging to that zone (for example, Canny Valley with two missions shows 02) instead of the zone's ordinal position in the rendered list. The count is derived from the same grouped mission data used for rendering and is unaffected by zone order or missing zones.
+
+### Changed
+- Daily mission/reminder processing now starts at **00:00:15 UTC** instead of 00:00:30 UTC. The architecture is unchanged: the cron trigger still fires at 00:00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 15-second delay inside `ctx.waitUntil`, because Cloudflare cron triggers only support minute granularity.
+- Mission images are now rendered at higher quality through ScreenshotOne (`device_scale_factor: 2`, `image_quality: 100`), producing sharper output at twice the pixel density. The PNG format, logical viewport dimensions, HTML/CSS layout, and image-caching behavior are unchanged.
+
+### Tests
+- Regression tests for `ZT_TheForest` and campaign-prefixed zone-theme resolution.
+- Regression tests for storm-category Atlas icon resolution.
+- Regression tests for the ScreenshotOne quality settings (device scale factor 2 and image quality 100 with an unchanged viewport and PNG format) and for per-zone mission-count numbering.
+- Reminder-schedule regression tests updated for the 00:00:15 UTC schedule.
+
+### Documentation
+- Updated the reminder timing, test overview, and release information in the README.
+
 ## [1.2.0] - 2026-09-03
 
 ### Added

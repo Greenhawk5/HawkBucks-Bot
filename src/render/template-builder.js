@@ -61,7 +61,7 @@ export function getMissionLayout(missionCount, options) {
   };
 }
 
-function missionCard(mission, index, layout, showRibbon, zoneIndex) {
+function missionCard(mission, index, layout, showRibbon, zoneCount) {
   const type = mission.mission?.type || "Unknown Mission";
   const category = mission.mission?.category || "No category";
   const zone = mission.zone || "Unknown zone";
@@ -75,7 +75,7 @@ function missionCard(mission, index, layout, showRibbon, zoneIndex) {
     <article class="mission-card${showRibbon ? " has-zone-ribbon" : ""}" style="--zone-start:${theme.start};--zone-end:${theme.end};--zone-accent:${theme.accent}">
       ${showRibbon ? `<div class="zone-ribbon">
         <span class="zone-name">${escapeHtml(zone)}</span>
-        <span class="zone-count">${String(zoneIndex + 1).padStart(2, "0")}</span>
+        <span class="zone-count">${String(zoneCount).padStart(2, "0")}</span>
       </div>` : ""}
       <div class="mission-panel">
         <div class="mission-icon-wrap"><img class="mission-icon" src="${icon}" alt="" /></div>
@@ -549,15 +549,21 @@ function getStyles(layout) {
 
 export function buildMissionCards(missions, layout = getMissionLayout(missions.length)) {
   const orderedMissions = groupAndSortMissions(missions);
-  let previousZone;
-  let zoneIndex = -1;
 
+  // The number shown on a zone ribbon is the mission count for that zone,
+  // not the zone's position in the rendered list.
+  const zoneCounts = new Map();
+  for (const mission of orderedMissions) {
+    const zone = mission.zone || "Unknown zone";
+    zoneCounts.set(zone, (zoneCounts.get(zone) || 0) + 1);
+  }
+
+  let previousZone;
   return orderedMissions.map((mission, index) => {
     const zone = mission.zone || "Unknown zone";
     const showRibbon = zone !== previousZone;
-    if (showRibbon) zoneIndex += 1;
     previousZone = zone;
-    return missionCard(mission, index, layout, showRibbon, zoneIndex);
+    return missionCard(mission, index, layout, showRibbon, zoneCounts.get(zone) || 1);
   }).join("\n");
 }
 

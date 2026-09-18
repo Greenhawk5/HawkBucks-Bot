@@ -624,6 +624,8 @@ HawkBucks-Bot/
 │   ├── admin-core.test.js
 │   ├── admin-data.test.js
 │   ├── callback-dispatch.test.js
+│   ├── icon-map.test.js
+│   ├── image-rendering.test.js
 │   ├── migration.test.js
 │   ├── recipients.test.js
 │   └── helpers/
@@ -696,7 +698,7 @@ The current deployment configuration includes:
 
 The scheduled trigger is configured through Cloudflare Cron and invokes the Worker's scheduled handler.
 
-The daily reminder runs at **00:00:30 UTC every day**. Cloudflare cron triggers only support minute granularity, so the trigger fires at 00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 30-second delay before mission processing starts.
+The daily reminder runs at **00:00:15 UTC every day**. Cloudflare cron triggers only support minute granularity, so the trigger fires at 00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 15-second delay before mission processing starts.
 
 ---
 
@@ -864,7 +866,7 @@ The current test suite covers important parts of the application, including:
 * PDF generation, font embedding, text extraction, and layout geometry
 * Regression coverage for production bugs fixed during development
 
-The full suite currently passes **78/78 tests**.
+The full suite contains **112 regression tests** across mission parsing, mission naming/zone mapping, icon resolution, image rendering, reminder scheduling, reminder recipients, Telegram formatting, Admin Panel behavior, broadcasts, migrations, and deployment-critical regression coverage.
 
 The intended development workflow is:
 
@@ -1238,12 +1240,12 @@ The changelog follows a structure inspired by **Keep a Changelog**, with version
 The current release baseline is:
 
 ```text
-1.2.0
+1.2.5
 ```
 
 The project follows Semantic Versioning for releases where practical.
 
-Version 1.2.0 includes the corrected Save the World mission Power Level resolution (current Epic difficulty tiers, Canny Valley correction, and group-mission difficulty rows), the Admin Panel Cache Settings for mission image cache inspection and confirmed deletion, the 00:00:30 UTC daily reminder schedule, and related regression tests.
+Version 1.2.5 includes corrected zone-name resolution for unmapped and campaign-prefixed Epic zone themes, correct storm-mission Atlas icons for localized storm titles, mission images rendered at higher quality (device scale factor 2 with unchanged logical dimensions), zone ribbons that display the actual mission count per zone, the 00:00:15 UTC daily reminder schedule, and related regression tests.
 
 ---
 

@@ -37,7 +37,7 @@ No JS, no frameworks, no external requests at render time.
    nothing else changes. Cards are flex, no absolute positioning.
 3. If `missions.length >= 8`, add `class="count-dense"` to `<body>`.
    That is the only layout switch; 2–10 missions all fit the fixed canvas.
-4. Screenshot `.canvas` at viewport 1080 × 1620, `deviceScaleFactor: 1`.
+4. Screenshot `.canvas` at viewport 1080 × 1620, `deviceScaleFactor: 2`.
 
 ## Icon paths (reserved slots, drop-in)
 
