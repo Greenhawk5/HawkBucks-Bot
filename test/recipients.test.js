@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { createFakeDb } from "./helpers/fake-db.js";
 import { listBroadcastRecipients, countBroadcastRecipients, recipientType } from "../database/recipients.js";
+import { createD1 } from "./helpers/d1-lite.js";
 
 const schema = await readFile("database/schema.sql", "utf8");
 
@@ -166,5 +167,81 @@ test("recipientType rejects channels and unknown types for custom broadcast", ()
   assert.ok(recipientType("users"));
   assert.ok(recipientType("groups"));
 });
+
+// ---------- Real SQLite & Placeholder Consistency ----------
+
+test("REAL SQLITE: every users and groups filter executes without binding errors (non-empty database)", async () => {
+  const d1 = createD1();
+  d1.raw.prepare("INSERT INTO users (telegram_id, username, first_name, reminder_enabled, last_seen) VALUES ('1', 'alice', 'Alice', 1, '2026-08-29 10:00:00'), ('2', 'bob', 'Bob', 0, '2026-08-01 10:00:00'), ('3', NULL, 'Carol', 1, '2026-08-28 09:00:00'), ('4', 'dave', 'Dave', 1, NULL)").run();
+  d1.raw.prepare("INSERT INTO groups (id, title, type, reminder_enabled, last_seen) VALUES ('-100111', 'Bots', 'group', 0, '2026-08-29 08:00:00'), ('-100222', 'Active Group', 'supergroup', 1, '2026-08-29 07:00:00'), ('-100333', 'Old Group', 'group', 1, '2026-08-01 07:00:00')").run();
+
+  const types = ["users", "groups"];
+  const filters = ["all", "on", "off", "active", "inactive"];
+
+  for (const type of types) {
+    for (const filter of filters) {
+      const count = await countBroadcastRecipients(d1, type, filter, { now: FIXTURE_NOW });
+      assert.ok(typeof count === "number" && count > 0, `${type} ${filter} count should be > 0`);
+      const rows = await listBroadcastRecipients(d1, type, filter, { now: FIXTURE_NOW, offset: 0, limit: 10 });
+      assert.ok(Array.isArray(rows) && rows.length > 0, `${type} ${filter} rows should be non-empty`);
+      assert.equal(rows.length, count, `${type} ${filter} count matches row length within limit`);
+    }
+  }
+});
+
+test("REAL SQLITE: every users and groups filter executes without binding errors (empty database)", async () => {
+  const d1 = createD1();
+  const types = ["users", "groups"];
+  const filters = ["all", "on", "off", "active", "inactive"];
+
+  for (const type of types) {
+    for (const filter of filters) {
+      const count = await countBroadcastRecipients(d1, type, filter, { now: FIXTURE_NOW });
+      assert.equal(count, 0, `${type} ${filter} count should be 0`);
+      const rows = await listBroadcastRecipients(d1, type, filter, { now: FIXTURE_NOW, offset: 0, limit: 10 });
+      assert.deepEqual(rows, [], `${type} ${filter} rows should be empty array`);
+    }
+  }
+});
+
+test("SQL placeholder and binding consistency for all filters and counts", async () => {
+  const recorded = [];
+  const d1 = createD1({
+    intercept: (sql, args) => {
+      const placeholders = (sql.match(/\?/g) || []).length;
+      assert.equal(
+        args.length,
+        placeholders,
+        `Placeholder mismatch in SQL:\n${sql}\nExpected ${placeholders} bindings, got ${args.length}: ${JSON.stringify(args)}`
+      );
+      recorded.push({ sql, argsLength: args.length, placeholders });
+    },
+  });
+
+  for (const type of ["users", "groups"]) {
+    for (const filter of ["all", "on", "off", "active", "inactive"]) {
+      await countBroadcastRecipients(d1, type, filter, { now: FIXTURE_NOW });
+      await listBroadcastRecipients(d1, type, filter, { now: FIXTURE_NOW, offset: 0, limit: 10 });
+    }
+  }
+
+  assert.equal(recorded.length, 20, "2 queries per filter (count + list) x 5 filters x 2 types");
+});
+
+test("optional SQL conditions dynamically append WHERE clauses and parameters safely", async () => {
+  const d1 = createD1();
+  d1.raw.prepare("INSERT INTO users (telegram_id, username, first_name, reminder_enabled, last_seen) VALUES ('1', 'alice', 'Alice', 1, '2026-08-29 10:00:00'), ('2', 'bob', 'Bob', 1, '2026-08-29 10:00:00')").run();
+
+  const extra = [
+    { clause: "username = ?", params: ["alice"] },
+  ];
+
+  const count = await countBroadcastRecipients(d1, "users", "all", { extraConditions: extra });
+  assert.equal(count, 1);
+  const rows = await listBroadcastRecipients(d1, "users", "all", { extraConditions: extra });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].username, "alice");
+});
+
 
 

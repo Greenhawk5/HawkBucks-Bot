@@ -47,20 +47,27 @@ function cachedReminder(cached) {
 
 export async function prepareMissionReminder(env, db) {
   const date = missionDate();
+  console.log("MISSION_PREPARATION_STARTED", { date });
 
   if (!FORCE_NEW_MISSION_IMAGE) {
     const cached = await getMissionImage(db, date);
     if (cached?.status === "ready") {
+      console.log("MISSION_IMAGE_CACHE_HIT", { date });
       return cachedReminder(cached);
     }
+    console.log("MISSION_IMAGE_CACHE_MISS", { date, status: cached?.status || "none" });
   }
 
   const reserved = FORCE_NEW_MISSION_IMAGE ? true : await reserveMissionImage(db, date);
   if (!reserved) {
+    // Another request is already generating today's image: wait for it instead
+    // of starting a second generation.
+    console.log("MISSION_IMAGE_CACHE_WAITING", { date });
     for (let attempt = 0; attempt < 20; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       const pending = await getMissionImage(db, date);
       if (pending?.status === "ready") {
+        console.log("MISSION_IMAGE_CACHE_HIT", { date, waitedMs: (attempt + 1) * 1000 });
         return cachedReminder(pending);
       }
     }
@@ -70,9 +77,15 @@ export async function prepareMissionReminder(env, db) {
   try {
     const { missions: rawMissions } = await getDailyMissions(env);
     const missions = groupAndSortMissions(rawMissions);
-    const image = missions.length > 0
-      ? await generateMissionImage(missions, env)
-      : decodeDataUri(assets.noMission);
+    let image;
+    if (missions.length > 0) {
+      const imageStartMs = Date.now();
+      console.log("MISSION_IMAGE_GENERATION_STARTED", { date, missionCount: missions.length });
+      image = await generateMissionImage(missions, env);
+      console.log("MISSION_IMAGE_GENERATION_COMPLETED", { date, durationMs: Date.now() - imageStartMs });
+    } else {
+      image = decodeDataUri(assets.noMission);
+    }
     return {
       date,
       missions,
@@ -82,6 +95,7 @@ export async function prepareMissionReminder(env, db) {
       ownsReservation: !FORCE_NEW_MISSION_IMAGE,
     };
   } catch (error) {
+    console.error("MISSION_PREPARATION_FAILED", { date, error: error.message });
     if (!FORCE_NEW_MISSION_IMAGE) await releaseMissionImageReservation(db, date);
     throw error;
   }

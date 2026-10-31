@@ -136,11 +136,22 @@ export function createFakeDb(tables = {}) {
     prepare(sql) {
       sqlLog.push(sql);
       let boundArgs = [];
+      let isBound = false;
+      function validateBindings() {
+        const matches = sql.match(/\?/g);
+        const expected = matches ? matches.length : 0;
+        if (isBound && boundArgs.length !== expected) {
+          throw new Error(`D1_ERROR: Wrong number of parameter bindings for SQL query. Expected ${expected}, got ${boundArgs.length}.`);
+        }
+        if (!isBound && expected > 0) {
+          throw new Error(`D1_ERROR: Wrong number of parameter bindings for SQL query. Expected ${expected}, got 0.`);
+        }
+      }
       return {
-        bind(...args) { boundArgs = args; return this; },
-        first() { return execute(sql, boundArgs).then((r) => (r.results ? r.results[0] ?? null : r)); },
-        all() { return execute(sql, boundArgs); },
-        run() { return execute(sql, boundArgs); },
+        bind(...args) { boundArgs = args; isBound = true; return this; },
+        first() { validateBindings(); return execute(sql, boundArgs).then((r) => (r.results ? r.results[0] ?? null : r)); },
+        all() { validateBindings(); return execute(sql, boundArgs); },
+        run() { validateBindings(); return execute(sql, boundArgs); },
       };
     },
   };

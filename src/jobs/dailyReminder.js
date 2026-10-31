@@ -28,13 +28,23 @@ export async function runDailyReminder(env) {
   const cycleKey = getReminderCycleKey();
   console.log("CRON_REMINDER_STARTED", { cycleKey, reminderTime: DAILY_REMINDER_TIME });
 
-  const acquired = await acquireReminderRun(db, cycleKey);
+  let acquired;
+  try {
+    acquired = await acquireReminderRun(db, cycleKey);
+  } catch (error) {
+    // No lock was taken, so there is nothing to release; still make the
+    // failure visible at the reminder level (not only at the cron level).
+    console.error("CRON_REMINDER_FAILED", { cycleKey, phase: "acquire", error: error.message });
+    throw error;
+  }
   if (!acquired) {
     console.log("CRON_REMINDER_SKIPPED_DUPLICATE", { cycleKey });
     return { skipped: true, reason: "duplicate_cycle" };
   }
 
   let reminder;
+  let sent = 0;
+  let failed = 0;
   try {
     const recipients = await getReminderRecipients(db);
     const counts = recipients.reduce((result, recipient) => {
@@ -53,8 +63,6 @@ export async function runDailyReminder(env) {
     console.log("MISSION_FETCH_COMPLETED", { cached: Boolean(reminder.telegramFileId), missionCount: reminder.missions.length });
     console.log("BROADCAST_STARTED", { recipients: recipients.length });
 
-    let sent = 0;
-    let failed = 0;
     for (const recipient of recipients) {
       try {
         await sendMissionReminder(recipient.chatId, env, db, { preparedReminder: reminder });
@@ -71,9 +79,36 @@ export async function runDailyReminder(env) {
     console.log("CRON_REMINDER_COMPLETED", { cycleKey, sent, failed });
     return { sent, failed };
   } catch (error) {
-    await releasePreparedMissionReminder(db, reminder);
-    await releaseReminderRun(db, cycleKey);
-    console.error("CRON_REMINDER_FAILED", { cycleKey, error: error.message });
+    // Reservation cleanup must never mask the original failure.
+    try {
+      await releasePreparedMissionReminder(db, reminder);
+    } catch (releaseError) {
+      console.error("CRON_RESERVATION_RELEASE_FAILED", { cycleKey, error: releaseError.message });
+    }
+
+    if (sent > 0) {
+      // At least one Telegram message already went out for this cycle.
+      // Finalize as 'completed' so a later retry can never double-send;
+      // per-recipient delivery errors are already counted in `failed`.
+      try {
+        await completeReminderRun(db, cycleKey);
+        console.error("CRON_REMINDER_FAILED_AFTER_DELIVERY", { cycleKey, sent, failed, error: error.message });
+      } catch (completeError) {
+        // Could not finalize: leave the 'running' row in place (it blocks
+        // re-acquisition for 30 minutes) rather than releasing the lock.
+        console.error("CRON_REMINDER_FINALIZE_FAILED", { cycleKey, sent, failed, error: completeError.message });
+      }
+    } else {
+      // Nothing was delivered: keep the failure visible in D1
+      // (status='failed') and release the cycle so it can be retried.
+      try {
+        await releaseReminderRun(db, cycleKey);
+      } catch (releaseError) {
+        console.error("CRON_REMINDER_RELEASE_FAILED", { cycleKey, error: releaseError.message });
+      }
+    }
+
+    console.error("CRON_REMINDER_FAILED", { cycleKey, sent, failed, error: error.message });
     throw error;
   }
 }

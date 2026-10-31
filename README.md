@@ -624,10 +624,13 @@ HawkBucks-Bot/
 │   ├── admin-core.test.js
 │   ├── admin-data.test.js
 │   ├── callback-dispatch.test.js
+│   ├── cron-scheduled.test.js
+│   ├── daily-reminder.test.js
 │   ├── icon-map.test.js
 │   ├── image-rendering.test.js
 │   ├── migration.test.js
 │   ├── recipients.test.js
+│   ├── reminder-runs.test.js
 │   └── helpers/
 │
 ├── .github/
@@ -698,7 +701,20 @@ The current deployment configuration includes:
 
 The scheduled trigger is configured through Cloudflare Cron and invokes the Worker's scheduled handler.
 
-The daily reminder runs at **00:00:15 UTC every day**. Cloudflare cron triggers only support minute granularity, so the trigger fires at 00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 15-second delay before mission processing starts.
+The daily reminder runs at **00:00:15 UTC every day**. Cloudflare cron triggers execute in UTC and only support minute granularity, so the trigger fires at 00:00 UTC (`0 0 * * *`) and the scheduled handler applies a fixed 15-second delay — through the Workers `scheduler.wait()` API — before mission processing starts.
+
+The scheduled handler awaits both the delay and the entire reminder pipeline directly on the promise it returns. Per Cloudflare's Scheduled Handler documentation, the runtime waits for that promise for up to 15 minutes, so a single critical task does not use `ctx.waitUntil()`. Reminder failures are rethrown so the Cron invocation status records the exception.
+
+Cron lifecycle log events (Workers Logs), in order:
+
+1. `CRON_TRIGGER_RECEIVED` — `cron`, `scheduledTime`, `actualTime`, `schedulerDelayMs` (Cloudflare-side lateness measured against `scheduledTime`, separate from the intentional delay)
+2. `CRON_DELAY_STARTED` / `CRON_DELAY_FINISHED` — the deliberate 15-second offset (`delayMs`, `waitedMs`)
+3. `CRON_REMINDER_STARTED` … `CRON_REMINDER_COMPLETED` / `CRON_REMINDER_FAILED` — the reminder pipeline: `RECIPIENTS_FOUND`, `MISSION_PREPARATION_STARTED`, `MISSION_IMAGE_CACHE_HIT`/`MISS`, `MISSION_IMAGE_GENERATION_STARTED`/`COMPLETED`, `MISSION_FETCH_COMPLETED`, `BROADCAST_STARTED`, per-recipient `MESSAGE_SENT`/`MESSAGE_FAILED`
+4. `CRON_TASK_COMPLETED` (`totalDurationMs`) / `CRON_TASK_FAILED` (`error`) — terminal invocation events
+
+A canceled invocation never emits its terminal `CRON_TASK_*` event, so the last `CRON_*` event present in the logs identifies the interrupted phase.
+
+Duplicate protection lives in the D1 `reminder_runs` table, keyed per UTC day (for example `daily:2026-09-25:0:0:UTC`): successful runs are marked `completed` and can never run again; failed runs are retained as `failed` (never deleted, so they stay diagnosable) and remain retryable; a `running` row stuck for more than 30 minutes (crashed or canceled invocation) is promoted to `failed` and also becomes retryable. A cycle that already delivered at least one message is always finalized as `completed`, so a retry can never double-send.
 
 ---
 
@@ -1240,12 +1256,16 @@ The changelog follows a structure inspired by **Keep a Changelog**, with version
 The current release baseline is:
 
 ```text
-1.2.5
+1.2.8
 ```
 
 The project follows Semantic Versioning for releases where practical.
 
-Version 1.2.5 includes corrected zone-name resolution for unmapped and campaign-prefixed Epic zone themes, correct storm-mission Atlas icons for localized storm titles, mission images rendered at higher quality (device scale factor 2 with unchanged logical dimensions), zone ribbons that display the actual mission count per zone, the 00:00:15 UTC daily reminder schedule, and related regression tests.
+Version 1.2.8 introduces critical reliability and architectural improvements:
+- **Daily reminder Cron execution reliability:** Directly awaits the 15-second sub-minute offset (via the Workers `scheduler.wait()` API) and the reminder pipeline on the promise returned by `scheduled()`, resolving premature invocation cancellation.
+- **D1 reminder run state machine & retention:** Retains failed and crashed runs as `status = 'failed'` for operational diagnosis instead of deleting records, while preventing duplicate reminder deliveries after partial sends.
+- **Admin Panel Broadcast SQL parameter binding fix:** Resolves D1 parameter binding errors across all 10 recipient filters by dynamically pairing SQL WHERE clauses with parameter bindings.
+- **Comprehensive test harness & SQLite validation:** Hardened mock D1 test adapter against placeholder mismatches, and added automated test coverage executing against real SQLite (`DatabaseSync(":memory:")`).
 
 ---
 

@@ -236,8 +236,20 @@ test("bc:filter renders the selection screen for Groups → Reminder OFF (no Ref
   }
 });
 
-test("bc:filter renders Users → All, Groups → All and Groups → Inactive without errors", async () => {
-  for (const [type, filter] of [["users", "all"], ["groups", "all"], ["groups", "inactive"]]) {
+test("bc:filter renders all 10 recipient filter combinations without errors", async () => {
+  const allCombinations = [
+    ["users", "all"],
+    ["users", "on"],
+    ["users", "off"],
+    ["users", "active"],
+    ["users", "inactive"],
+    ["groups", "all"],
+    ["groups", "on"],
+    ["groups", "off"],
+    ["groups", "active"],
+    ["groups", "inactive"],
+  ];
+  for (const [type, filter] of allCombinations) {
     const db = createFakeDb({
       users: makeUsers(2),
       groups: [{ id: "-100111", title: "Bots", reminder_enabled: 0, last_seen: "2026-08-29 08:00:00" }],
@@ -261,6 +273,7 @@ test("bc:filter renders Users → All, Groups → All and Groups → Inactive wi
     }
   }
 });
+
 
 
 test("non-admin forged broadcast callbacks are denied and never reach waitUntil", async () => {
@@ -310,6 +323,120 @@ test("admin callbacks in group chats are denied (private only)", async () => {
     restore();
   }
 });
+
+test("empty recipient selection rejects next step with feedback", async () => {
+  const db = createFakeDb({ users: makeUsers(2) });
+  await setAdminSession(db, "701", {
+    flow: "broadcast", step: "select", type: "users", filter: "all",
+    selectedIds: [],
+  });
+
+  const { calls, restore } = installTelegramStub();
+  try {
+    await handleBroadcastCallback(
+      ADMIN_ENV, db,
+      { chatId: "701", messageId: 42, queryId: "q-empty", parts: ["admin", "bc", "next", "users", "all"] }
+    );
+    const answers = calls.filter((c) => c.url.includes("/answerCallbackQuery"));
+    assert.ok(answers.some((c) => c.body?.text?.includes("at least one recipient")));
+    const session = await getAdminSession(db, "701");
+    assert.equal(session.step, "select", "must not transition to message_input step");
+  } finally {
+    restore();
+  }
+});
+
+test("duplicate send prevention: double-clicking confirm rejects second submission", async () => {
+  const db = createFakeDb({ users: makeUsers(2) });
+  await setAdminSession(db, "702", {
+    flow: "broadcast", step: "preview", type: "users", filter: "all",
+    selectedIds: ["1"], messageText: "prevent dupes",
+  });
+
+  const { calls, restore } = installTelegramStub();
+  const ctx = fakeCtx();
+  try {
+    // First send click: succeeds and clears session
+    const first = await handleBroadcastCallback(
+      ADMIN_ENV, db,
+      { chatId: "702", messageId: 42, queryId: "q-send-1", parts: ["admin", "bc", "send"], ctx }
+    );
+    assert.equal(first, true);
+    assert.equal(ctx.tasks.length, 1);
+    assert.equal(await getAdminSession(db, "702"), null);
+
+    // Second send click immediately afterwards (e.g. double click)
+    const second = await handleBroadcastCallback(
+      ADMIN_ENV, db,
+      { chatId: "702", messageId: 42, queryId: "q-send-2", parts: ["admin", "bc", "send"], ctx }
+    );
+    assert.equal(second, true);
+    assert.equal(ctx.tasks.length, 1, "must not launch a second broadcast task");
+
+    const answers = calls.filter((c) => c.url.includes("/answerCallbackQuery"));
+    assert.ok(answers.some((c) => c.body?.text?.includes("Session expired")));
+
+    await ctx.tasks[0];
+  } finally {
+    restore();
+  }
+});
+
+test("partial delivery failure correctly tallies successes and failures in history and summary", async () => {
+  const db = createFakeDb({ users: makeUsers(3) });
+  await setAdminSession(db, "703", {
+    flow: "broadcast", step: "preview", type: "users", filter: "all",
+    selectedIds: ["1", "2", "3"], messageText: "partial test",
+  });
+
+  const calls = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const body = typeof init?.body === "string" ? JSON.parse(init.body) : null;
+    calls.push({ url: String(url), body });
+    // Recipient "2" fails (e.g. blocked bot 403)
+    if (body?.chat_id === "2") {
+      return {
+        ok: false,
+        status: 403,
+        json: async () => ({ ok: false, description: "Forbidden: bot was blocked by the user" }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 1 } }),
+    };
+  };
+
+  const ctx = fakeCtx();
+  try {
+    await handleBroadcastCallback(
+      ADMIN_ENV, db,
+      { chatId: "703", messageId: 42, queryId: "q-partial", parts: ["admin", "bc", "send"], ctx }
+    );
+    assert.equal(ctx.tasks.length, 1);
+    const result = await ctx.tasks[0];
+    assert.equal(result.successCount, 2);
+    assert.equal(result.failedCount, 1);
+    assert.equal(result.total, 3);
+
+    // Verify broadcast history was recorded
+    assert.equal(db.state.broadcast_history.length, 1);
+    assert.equal(db.state.broadcast_history[0].recipient_count, 3);
+    assert.equal(db.state.broadcast_history[0].success_count, 2);
+    assert.equal(db.state.broadcast_history[0].failed_count, 1);
+
+    // Verify summary message sent to admin contains exact counts
+    const summaryCall = calls.find((c) => c.url.includes("/sendMessage") && String(c.body?.chat_id) === "111222333");
+    assert.ok(summaryCall, "summary must be sent to admin");
+    assert.ok(summaryCall.body.text.includes("Sent: 2"));
+    assert.ok(summaryCall.body.text.includes("Failed: 1"));
+    assert.ok(summaryCall.body.text.includes("Total: 3"));
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 
 
 

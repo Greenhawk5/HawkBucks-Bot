@@ -62,15 +62,47 @@ export function recipientType(type) {
   return RECIPIENT_TYPES[type] || null;
 }
 
-function filterClause(filter, cutoff) {
+export function buildRecipientFilter(type, filter, cutoff, { extraConditions = [] } = {}) {
+  let base;
   switch (filter) {
-    case "on": return "reminder_enabled = 1";
-    case "off": return "reminder_enabled = 0";
-    case "active": return "last_seen >= ?";
-    case "inactive": return "(last_seen IS NULL OR last_seen < ?)";
+    case "on":
+      base = { clause: "reminder_enabled = 1", params: [] };
+      break;
+    case "off":
+      base = { clause: "reminder_enabled = 0", params: [] };
+      break;
+    case "active":
+      base = { clause: "last_seen >= ?", params: [cutoff] };
+      break;
+    case "inactive":
+      base = { clause: "(last_seen IS NULL OR last_seen < ?)", params: [cutoff] };
+      break;
     case "all":
-    default: return "1=1";
+    default:
+      base = { clause: "1=1", params: [] };
+      break;
   }
+
+  if (!extraConditions.length) {
+    return base;
+  }
+
+  const clauses = [base.clause];
+  const params = [...base.params];
+  for (const cond of extraConditions) {
+    if (cond?.clause) {
+      clauses.push(cond.clause);
+      if (Array.isArray(cond.params)) {
+        params.push(...cond.params);
+      }
+    }
+  }
+
+  return { clause: clauses.join(" AND "), params };
+}
+
+export function filterClause(filter, cutoff) {
+  return buildRecipientFilter(null, filter, cutoff).clause;
 }
 
 export async function listBroadcastRecipients(db, type, filter, {
@@ -78,26 +110,30 @@ export async function listBroadcastRecipients(db, type, filter, {
   limit = 10,
   now = new Date(),
   activityWindowDays = ACTIVE_WINDOW_DAYS,
+  extraConditions = [],
 } = {}) {
   const cfg = recipientType(type);
   if (!cfg) return [];
   const cutoff = activityCutoff(now, activityWindowDays);
-  const where = filterClause(filter, cutoff);
+  const { clause, params } = buildRecipientFilter(type, filter, cutoff, { extraConditions });
   const rows = await db.prepare(
     `SELECT ${cfg.columns} FROM ${cfg.table}
-     WHERE ${where} ORDER BY ${cfg.idColumn} LIMIT ? OFFSET ?`
-  ).bind(cutoff, limit, offset).all();
+     WHERE ${clause} ORDER BY ${cfg.idColumn} LIMIT ? OFFSET ?`
+  ).bind(...params, limit, offset).all();
   return (rows.results || []).map(cfg.normalize);
 }
 
 export async function countBroadcastRecipients(db, type, filter, {
   now = new Date(),
   activityWindowDays = ACTIVE_WINDOW_DAYS,
+  extraConditions = [],
 } = {}) {
   const cfg = recipientType(type);
   if (!cfg) return 0;
   const cutoff = activityCutoff(now, activityWindowDays);
-  const where = filterClause(filter, cutoff);
-  const row = await db.prepare(`SELECT COUNT(*) AS c FROM ${cfg.table} WHERE ${where}`).bind(cutoff).first();
+  const { clause, params } = buildRecipientFilter(type, filter, cutoff, { extraConditions });
+  const stmt = db.prepare(`SELECT COUNT(*) AS c FROM ${cfg.table} WHERE ${clause}`);
+  const row = params.length > 0 ? await stmt.bind(...params).first() : await stmt.first();
   return Number(row?.c || 0);
 }
+

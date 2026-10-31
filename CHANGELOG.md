@@ -5,6 +5,39 @@ All notable changes to HawkBucks Bot are documented in this file.
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows Semantic Versioning where practical.
 
+## [1.2.8] - 2026-10-31
+
+### Fixed
+- **Admin Panel Broadcast SQL parameter binding failure (`ADMIN_CALLBACK_FAILED` `bc:filter`).** Resolved a Cloudflare D1 parameter binding mismatch where `countBroadcastRecipients` and `listBroadcastRecipients` bound `cutoff` unconditionally even when the WHERE clause contained 0 placeholders (`all`, `on`, `off`), throwing `D1_ERROR: Wrong number of parameter bindings for SQL query.`. Introduced `buildRecipientFilter()` to dynamically pair SQL WHERE clauses with their exact required parameter bindings (`[]` for `all`, `on`, `off`; `[cutoff]` for `active`, `inactive`).
+- **Daily reminder Cron reliability (production incident 2026-09-25).** The scheduled handler previously registered the entire reminder pipeline fire-and-forget inside `ctx.waitUntil()` and returned immediately. The invocation was recorded with `$workers.outcome = "canceled"` while still inside the 15-second delay, so `runDailyReminder()` never executed. Per Cloudflare's Scheduled Handler documentation the runtime waits for the promise **returned by** `scheduled()` (up to the 15-minute duration limit), so the delay and the reminder pipeline are now awaited directly on that promise. This keeps the invocation open for the whole job and makes the recorded Cron outcome (`ok`/`exception`) reflect the real result; reminder failures are rethrown instead of being isolated inside a detached task.
+- **D1 reminder run state machine & retention.** Reminder failures no longer delete their `reminder_runs` row: a failed run is retained in D1 as `status = 'failed'` (with `completed_at` set) for diagnosis, while remaining retryable because the acquire path re-claims `failed` rows. A crashed run stuck in `running` beyond the 30-minute stale window is promoted to `failed` instead of being deleted, so crash evidence is preserved.
+- **Duplicate reminder delivery protection.** A failure that occurs **after** Telegram messages were already delivered now finalizes the cycle as `completed` (or leaves the `running` lock held if finalization itself fails) instead of releasing it into a retryable state, so a retry can never double-send a cycle that already delivered.
+- **Broadcast recipient selection & duplicate prevention.** Enforced server-side validation rejecting empty recipient selection prior to message input, implemented immediate session clearance upon broadcast confirmation to prevent duplicate deliveries on double-click, and handled individual Telegram delivery errors (e.g. 403 Forbidden for blocked bots) gracefully without interrupting the broadcast run.
+
+### Changed
+- The intentional 15-second offset now uses the Workers `scheduler.wait()` API instead of `setTimeout`, matching the documented await-able delay mechanism for this runtime (verified against the project's compatibility date `2026-07-25`, including inside the `scheduled` context). The 00:00:15 UTC target is unchanged.
+- Reminder-run reservation cleanup (`releasePreparedMissionReminder`) failures are logged without masking the original pipeline error.
+- Updated `wrangler` devDependency to `^4.156.0` to match the production deployment toolchain.
+
+### Added
+- Scheduler timing instrumentation in `scheduled()`: `CRON_TRIGGER_RECEIVED` now logs `scheduledTime`, `actualTime` and `schedulerDelayMs` (Cloudflare-side lateness), followed by `CRON_DELAY_STARTED`/`CRON_DELAY_FINISHED` (`delayMs`, `waitedMs`) and terminal `CRON_TASK_COMPLETED` (`totalDurationMs`) / `CRON_TASK_FAILED` events, separating scheduler delay from application delay and making interruptions diagnosable by the absence of a terminal event.
+- Pipeline observability logs: `MISSION_PREPARATION_STARTED`, `MISSION_IMAGE_CACHE_HIT`/`MISS`/`WAITING`, `MISSION_IMAGE_GENERATION_STARTED`/`COMPLETED`, `MISSION_PREPARATION_FAILED`, plus `sent`/`failed` counts on `CRON_REMINDER_FAILED`.
+- Extensible recipient filtering: `buildRecipientFilter`, `listBroadcastRecipients`, and `countBroadcastRecipients` support optional `extraConditions` for dynamic SQL query composition.
+
+### Tests
+- Real SQLite test suite (`test/helpers/d1-lite.js`) backed by `node:sqlite` running against `database/schema.sql`.
+- Added `test/cron-scheduled.test.js`: Validates awaited lifecycle, scheduler-delay calculation, failure propagation, and ensures no `ctx.waitUntil` regression.
+- Added `test/reminder-runs.test.js`: Validates atomic acquisition, retry of failed runs, crash promotion, and row retention against real SQLite.
+- Added `test/daily-reminder.test.js`: Validates successful delivery, duplicate cycle skip, pre-delivery failure handling, partial Telegram delivery lock, and reservation release.
+- Hardened `test/helpers/fake-db.js`: Validates that SQL `?` placeholder counts strictly match bound argument counts, throwing `D1_ERROR: Wrong number of parameter bindings for SQL query.` on mismatch.
+- Extended `test/recipients.test.js`: Tests all 10 Users and Groups filter combinations on real SQLite for both populated and empty tables, verifies placeholder/binding count parity, and tests optional conditions.
+- Extended `test/admin-broadcast.test.js`: Tests all 10 filter callbacks, empty recipient progression rejection, duplicate confirmation prevention, and partial delivery failure accounting in `broadcast_history` and admin summary.
+
+## [1.2.6] - 2026-09-18
+
+### Tests
+- **Deterministic activity window tests:** Injected explicit reference timestamp parameter (`now`) into `activityCutoff()` and recipient queries so test assertions are anchored to fixed test fixtures rather than the real-time system clock.
+
 ## [1.2.5] - 2026-09-18
 
 ### Fixed
@@ -136,7 +169,11 @@ and this project follows Semantic Versioning where practical.
 - Mission image generation and caching.
 - Automated testing foundation.
 
-[Unreleased]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.1.1...HEAD
-[1.1.1]: https://github.com/Greenhawk5/HawkBucks-Bot/releases/tag/v1.1.1
-[1.1.0]: https://github.com/Greenhawk5/HawkBucks-Bot/releases/tag/v1.1.0
+[Unreleased]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.2.8...HEAD
+[1.2.8]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.2.6...v1.2.8
+[1.2.6]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.2.5...v1.2.6
+[1.2.5]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.2.0...v1.2.5
+[1.2.0]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.1.1...v1.2.0
+[1.1.1]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/Greenhawk5/HawkBucks-Bot/compare/v0.1.0...v1.1.0
 [0.1.0]: https://github.com/Greenhawk5/HawkBucks-Bot/releases/tag/v0.1.0

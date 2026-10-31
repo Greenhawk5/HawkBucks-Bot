@@ -8,17 +8,83 @@ import { DAILY_REMINDER_DELAY_MS } from "./config/reminders.js";
 
 export default {
 
+	/**
+	 * Cloudflare Cron Trigger entry point (daily reminder).
+	 *
+	 * Timing model (Cloudflare cron runs in UTC with minute granularity):
+	 *   00:00:00 UTC  — `0 0 * * *` cron fires (declared in wrangler.jsonc)
+	 *   +15 seconds   — DAILY_REMINDER_DELAY_MS deliberate sub-minute offset
+	 *   ~00:00:15 UTC — runDailyReminder() starts
+	 *
+	 * Lifecycle: per the official Scheduled Handler documentation, the runtime
+	 * waits for the Promise returned by scheduled() to resolve (up to the
+	 * 15-minute duration limit), so a single critical task must be awaited
+	 * directly instead of being registered fire-and-forget via ctx.waitUntil().
+	 * Awaiting keeps the invocation open for the whole reminder pipeline and
+	 * makes the recorded invocation outcome (ok / exception) reflect the real
+	 * result of the job.
+	 *
+	 * Structured log lifecycle (in order):
+	 *   CRON_TRIGGER_RECEIVED { cron, scheduledTime, actualTime, schedulerDelayMs }
+	 *   CRON_DELAY_STARTED    { delayMs, delayTarget }
+	 *   CRON_DELAY_FINISHED   { delayMs, waitedMs }
+	 *   CRON_REMINDER_*       (pipeline logs, see src/jobs/dailyReminder.js)
+	 *   CRON_TASK_COMPLETED   { totalDurationMs, schedulerDelayMs, result }
+	 *   CRON_TASK_FAILED      { totalDurationMs, schedulerDelayMs, error }
+	 *
+	 * schedulerDelayMs = actual start − scheduledTime isolates Cloudflare-side
+	 * lateness from our own intentional 15-second delay. A canceled invocation
+	 * never reaches its terminal CRON_TASK_* event, so the last CRON_* event
+	 * present in Workers Logs identifies exactly which phase was interrupted.
+	 */
 	async scheduled(event, env, ctx) {
-		console.log("CRON_TRIGGER_RECEIVED", { cron: event.cron });
-		ctx.waitUntil((async () => {
-			// The new day starts at 00:00:00 UTC; the cron has minute
-			// granularity, so the intended 00:00:30 UTC execution point is
-			// reached with a fixed 30-second delay inside waitUntil.
+		const actualTimeMs = Date.now();
+		const scheduledTimeMs = Number.isFinite(event?.scheduledTime)
+			? event.scheduledTime
+			: actualTimeMs;
+		const schedulerDelayMs = Math.max(0, actualTimeMs - scheduledTimeMs);
+		const invocationStartMs = actualTimeMs;
+
+		console.log("CRON_TRIGGER_RECEIVED", {
+			cron: event.cron,
+			scheduledTime: new Date(scheduledTimeMs).toISOString(),
+			actualTime: new Date(actualTimeMs).toISOString(),
+			schedulerDelayMs,
+		});
+
+		try {
 			if (DAILY_REMINDER_DELAY_MS > 0) {
-				await new Promise((resolve) => setTimeout(resolve, DAILY_REMINDER_DELAY_MS));
+				const delayStartMs = Date.now();
+				console.log("CRON_DELAY_STARTED", {
+					delayMs: DAILY_REMINDER_DELAY_MS,
+					delayTarget: new Date(delayStartMs + DAILY_REMINDER_DELAY_MS).toISOString(),
+				});
+				// scheduler.wait() is the Workers-native await-able delay API
+				// (an alternative to setTimeout that needs no callback).
+				await scheduler.wait(DAILY_REMINDER_DELAY_MS);
+				console.log("CRON_DELAY_FINISHED", {
+					delayMs: DAILY_REMINDER_DELAY_MS,
+					waitedMs: Date.now() - delayStartMs,
+				});
 			}
-			await runDailyReminder(env);
-		})());
+
+			const result = await runDailyReminder(env);
+
+			console.log("CRON_TASK_COMPLETED", {
+				totalDurationMs: Date.now() - invocationStartMs,
+				schedulerDelayMs,
+				result,
+			});
+		} catch (error) {
+			console.error("CRON_TASK_FAILED", {
+				totalDurationMs: Date.now() - invocationStartMs,
+				schedulerDelayMs,
+				error: error?.message || String(error),
+			});
+			// Propagate so the Cron invocation outcome records the failure
+			// (exception) instead of a misleading success or cancel status.
+			throw error;
+		}
 	},
 
 	async fetch(request, env, ctx) {

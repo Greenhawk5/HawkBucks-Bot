@@ -13,13 +13,16 @@ export const DAILY_REMINDER_TIME = {
 // Cloudflare cron expressions run in UTC and only support minute granularity.
 // The reminder must run at 00:00:15 UTC: the cron fires at 00:00:00 UTC and
 // DAILY_REMINDER_DELAY_MS applies the remaining 15-second offset inside the
-// scheduled handler's ctx.waitUntil (timers are reliable there; scheduled
-// handlers get up to 15 minutes of wall time). Keep the cron aligned with
-// the trigger declared in wrangler.jsonc.
+// scheduled handler itself, using the Workers `scheduler.wait()` API. The
+// handler awaits the delay AND the reminder pipeline directly — per Cloudflare
+// docs the runtime waits for the promise returned by scheduled() for up to
+// 15 minutes, so no ctx.waitUntil() registration is needed for this single
+// critical task. Keep the cron aligned with the trigger declared in
+// wrangler.jsonc (both are guarded by test/reminder-schedule.test.js).
 export const DAILY_REMINDER_CRON = "0 0 * * *";
 
-// Delay between the 00:00:00 UTC cron firing and the start of the daily
-// mission/reminder processing (00:00:15 UTC total).
+// Deliberate sub-minute offset between the 00:00:00 UTC cron firing and the
+// start of the daily mission/reminder processing (00:00:15 UTC total).
 export const DAILY_REMINDER_DELAY_MS = 15_000;
 
 // Makes local/manual executions easier to repeat without sharing the normal
